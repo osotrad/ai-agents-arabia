@@ -59,3 +59,12 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Arabic article prose */
+.prose-ar p { margin-bottom: 1.25em; }
+.prose-ar h2 { font-size: 1.5rem; font-weight: 700; margin: 1.75em 0 0.75em; }
+.prose-ar h3 { font-size: 1.2rem; font-weight: 600; margin: 1.5em 0 0.5em; }
+.prose-ar ul, .prose-ar ol { padding-inline-start: 1.5em; margin-bottom: 1.25em; }
+.prose-ar li { margin-bottom: 0.4em; }
+.prose-ar a { color: var(--signal); text-decoration: underline; text-underline-offset: 3px; }
+.prose-ar strong { color: var(--paper); }
