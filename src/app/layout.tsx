@@ -29,7 +29,9 @@ export const metadata: Metadata = {
     "موقع عربي متخصص في وكلاء الذكاء الاصطناعي: أخبار، مصطلحات، وشروحات بتحليل عربي أصيل.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="ar"
