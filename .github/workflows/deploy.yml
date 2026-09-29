@@ -27,6 +27,7 @@ jobs:
         run: pnpm exec opennextjs-cloudflare build
 
       - name: Deploy to Cloudflare Workers
+        id: deploy
         run: pnpm exec opennextjs-cloudflare deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -35,12 +36,14 @@ jobs:
 
       - name: Smoke check
         run: |
-          URL="https://${{ vars.SITE_HOSTNAME }}"
-          if [ -z "${{ vars.SITE_HOSTNAME }}" ]; then
-            URL=$(pnpm exec wrangler deployments list --name ai-agents-arabia 2>/dev/null | grep -o 'https://[^ ]*workers.dev' | head -1)
+          URL="${{ vars.SITE_HOSTNAME }}"
+          if [ -z "$URL" ]; then
+            URL=$(pnpm exec wrangler deployments list --name ai-agents-arabia --json 2>/dev/null \
+              | grep -oE 'https://[a-z0-9.-]+workers\.dev' | head -1)
           fi
-          echo "Checking $URL"
-          sleep 10
+          echo "Checking -> $URL"
+          [ -n "$URL" ] || { echo "no deploy URL found"; exit 1; }
+          sleep 5
           curl -sf "$URL" | grep -q 'dir="rtl"'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
