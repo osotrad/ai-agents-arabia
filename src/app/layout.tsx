@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Arabic, IBM_Plex_Mono, Sora } from "next/font/google";
+import { SiteHeader, SiteFooter } from "@/components/site";
 import "./globals.css";
 
 const plexArabic = IBM_Plex_Sans_Arabic({
@@ -21,6 +22,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.SITE_URL ?? "http://localhost:3000"),
   title: {
     default: "وكلاء — ذكاء اصطناعي بالعربية",
     template: "%s — وكلاء",
@@ -39,7 +41,9 @@ export default function RootLayout({
       className={`${plexArabic.variable} ${sora.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-ink text-paper">
-        {children}
+        <SiteHeader />
+        <div className="flex-1">{children}</div>
+        <SiteFooter />
       </body>
     </html>
   );
