@@ -35,6 +35,13 @@ jobs:
 
       - name: Smoke check
         run: |
-          URL="https://${{ vars.SITE_HOSTNAME || 'ai-agents-arabia.workers.dev' }}"
-          sleep 15
+          URL="https://${{ vars.SITE_HOSTNAME }}"
+          if [ -z "${{ vars.SITE_HOSTNAME }}" ]; then
+            URL=$(pnpm exec wrangler deployments list --name ai-agents-arabia 2>/dev/null | grep -o 'https://[^ ]*workers.dev' | head -1)
+          fi
+          echo "Checking $URL"
+          sleep 10
           curl -sf "$URL" | grep -q 'dir="rtl"'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
