@@ -1,3 +1,4 @@
+import { marked } from "marked";
 import { db, articles, sources, articleSources } from "@/db";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -136,6 +137,7 @@ export async function verify(
  */
 export async function publish(draftArticle: Draft, candidateSourceIds: string[]) {
   const vec = await embed(`${draftArticle.titleAr}\n${draftArticle.bodyMd.slice(0, 1_000)}`);
+  const bodyHtml = (await marked.parse(draftArticle.bodyMd)) as string;
 
   const [a] = await db
     .insert(articles)
@@ -144,6 +146,7 @@ export async function publish(draftArticle: Draft, candidateSourceIds: string[])
       titleAr: draftArticle.titleAr,
       excerptAr: draftArticle.excerptAr,
       bodyMd: draftArticle.bodyMd,
+      bodyHtml,
       type: "news",
       status: "published",
       publishedAt: new Date(),
