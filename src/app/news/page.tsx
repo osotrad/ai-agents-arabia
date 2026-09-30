@@ -9,12 +9,17 @@ export const revalidate = 300;
 export const metadata: Metadata = { title: "الأخبار" };
 
 export default async function NewsPage() {
-  const list = await db
-    .select()
-    .from(articles)
-    .where(eq(articles.status, "published"))
-    .orderBy(desc(articles.publishedAt))
-    .limit(30);
+  let list: (typeof articles.$inferSelect)[] = [];
+  try {
+    list = await db
+      .select()
+      .from(articles)
+      .where(eq(articles.status, "published"))
+      .orderBy(desc(articles.publishedAt))
+      .limit(30);
+  } catch {
+    // DB not configured yet
+  }
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">

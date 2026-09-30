@@ -8,11 +8,16 @@ export const revalidate = 3600;
 export const metadata: Metadata = { title: "المصطلحات" };
 
 export default async function GlossaryPage() {
-  const terms = await db
-    .select()
-    .from(glossaryTerms)
-    .orderBy(asc(glossaryTerms.termAr))
-    .limit(200);
+  let terms: (typeof glossaryTerms.$inferSelect)[] = [];
+  try {
+    terms = await db
+      .select()
+      .from(glossaryTerms)
+      .orderBy(asc(glossaryTerms.termAr))
+      .limit(200);
+  } catch {
+    // DB not configured yet
+  }
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">

@@ -7,12 +7,17 @@ export const dynamic = "force-dynamic";
 export const revalidate = 300; // ISR: revalidate every 5 min
 
 export default async function Home() {
-  const latest = await db
-    .select()
-    .from(articles)
-    .where(eq(articles.status, "published"))
-    .orderBy(desc(articles.publishedAt))
-    .limit(6);
+  let latest: (typeof articles.$inferSelect)[] = [];
+  try {
+    latest = await db
+      .select()
+      .from(articles)
+      .where(eq(articles.status, "published"))
+      .orderBy(desc(articles.publishedAt))
+      .limit(6);
+  } catch {
+    // DB not configured yet — render hero only
+  }
 
   return (
     <main>

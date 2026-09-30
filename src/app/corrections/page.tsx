@@ -7,19 +7,24 @@ export const revalidate = 3600;
 export const metadata: Metadata = { title: "سياسة التصحيحات" };
 
 export default async function CorrectionsPage() {
-  const list = await db
-    .select({
-      id: corrections.id,
-      whatChanged: corrections.whatChanged,
-      note: corrections.publishedNote,
-      createdAt: corrections.createdAt,
-      slug: articles.slug,
-      title: articles.titleAr,
-    })
-    .from(corrections)
-    .leftJoin(articles, eq(corrections.articleId, articles.id))
-    .orderBy(desc(corrections.createdAt))
-    .limit(50);
+  let list: { id: string; whatChanged: string; note: string | null; createdAt: Date; slug: string | null; title: string | null }[] = [];
+  try {
+    list = await db
+      .select({
+        id: corrections.id,
+        whatChanged: corrections.whatChanged,
+        note: corrections.publishedNote,
+        createdAt: corrections.createdAt,
+        slug: articles.slug,
+        title: articles.titleAr,
+      })
+      .from(corrections)
+      .leftJoin(articles, eq(corrections.articleId, articles.id))
+      .orderBy(desc(corrections.createdAt))
+      .limit(50);
+  } catch {
+    // DB not configured yet
+  }
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
