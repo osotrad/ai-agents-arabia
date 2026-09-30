@@ -1,5 +1,5 @@
 import { db, tasks } from "@/db";
-import { and, eq, lte, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { runStep } from "./run-step";
 import { logger } from "./logger";
 
@@ -72,6 +72,9 @@ async function dispatch(task: { id: string; kind: string; payload: unknown }) {
       const { discover } = await import("./steps/discover");
       return runStep("discover", task.payload ?? {}, discover);
     }
+    case "pipeline": {
+      return runPipeline(task.payload as { sourceIds?: string[] });
+    }
     default:
       throw new Error(`unknown task kind: ${task.kind}`);
   }
@@ -83,6 +86,48 @@ export async function enqueue(kind: string, payload?: unknown, runAt?: Date) {
     payload: (payload ?? {}) as never,
     runAt: runAt ?? new Date(),
   });
+}
+
+async function runPipeline(payload: { sourceIds?: string[] }) {
+  const { dedupe, draft, verify, publish } = await import("./steps/draft");
+  const { runStep } = await import("./run-step");
+
+  // If no sourceIds provided, take latest unseen candidates
+  let sourceIds = payload.sourceIds;
+  if (!sourceIds || sourceIds.length === 0) {
+    const { sources } = await import("@/db/schema");
+    const { desc } = await import("drizzle-orm");
+    const rows = await db.select({ id: sources.id }).from(sources).orderBy(desc(sources.fetchedAt)).limit(3);
+    sourceIds = rows.map((r) => r.id);
+  }
+  if (sourceIds.length < 2) throw new Error("pipeline needs ≥2 sources");
+
+  // 1) dedupe against published embeddings on the candidate title area
+  const titleProbe = sourceIds.join("|");
+  const dd = await runStep("dedupe", { sourceIds }, async () => {
+    const r = await dedupe(titleProbe);
+    return { output: r, confidence: r.duplicate ? 0.2 : 0.8 };
+  });
+  if (dd.duplicate) {
+    logger.info({ similarity: dd.similarity }, "skipping duplicate topic");
+    return { skipped: true, reason: "duplicate" };
+  }
+
+  // 2) draft
+  const d = await runStep("draft", { sourceIds }, () => draft(sourceIds!));
+
+  // 3) verify
+  const v = await runStep("verify", { sourceIds }, () => verify(d, sourceIds!));
+  if (!v.pass) {
+    throw new Error(`verify failed: ${v.reasons.join("; ")}`);
+  }
+
+  // 4) publish
+  const p = await runStep("publish", { sourceIds }, async () => {
+    const out = await publish(d, sourceIds!);
+    return { output: out, confidence: 0.9 };
+  });
+  return { skipped: false, articleId: p.articleId, slug: p.slug };
 }
 
 function sleep(ms: number) {
