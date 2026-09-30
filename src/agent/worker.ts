@@ -75,6 +75,16 @@ async function dispatch(task: { id: string; kind: string; payload: unknown }) {
     case "pipeline": {
       return runPipeline(task.payload as { sourceIds?: string[] });
     }
+    case "recheck": {
+      const { recheckSweep } = await import("./steps/recheck");
+      return runStep("recheck", task.payload ?? {}, recheckSweep);
+    }
+    case "glossary": {
+      const { glossaryStep } = await import("./steps/glossary");
+      const payload = task.payload as { term?: string; sourceId?: string };
+      if (!payload.term) throw new Error("glossary task requires payload.term");
+      return runStep("glossary", payload as { term: string; sourceId?: string }, glossaryStep);
+    }
     default:
       throw new Error(`unknown task kind: ${task.kind}`);
   }
