@@ -12,6 +12,7 @@
     "agent:enqueue-discover": "tsx src/scripts/worker.ts --once"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@mozilla/readability": "^0.6.0",
     "@neondatabase/serverless": "^1.1.0",
     "drizzle-orm": "^0.45.3",
