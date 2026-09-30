@@ -136,6 +136,9 @@ export async function verify(
  * publish: persist article + link claims to sources, then revalidate.
  */
 export async function publish(draftArticle: Draft, candidateSourceIds: string[]) {
+  const { assertPublishCap, notify } = await import("../guard");
+  await assertPublishCap();
+
   const vec = await embed(`${draftArticle.titleAr}\n${draftArticle.bodyMd.slice(0, 1_000)}`);
   const bodyHtml = (await marked.parse(draftArticle.bodyMd)) as string;
 
@@ -165,6 +168,7 @@ export async function publish(draftArticle: Draft, candidateSourceIds: string[])
   );
 
   logger.info({ articleId: a.id, slug: a.slug }, "published");
+  notify(`📝 نُشر مقال جديد: *${a.titleAr}*\n${process.env.SITE_URL}/news/${a.slug}`).catch(() => {});
 
   // Notify the Cloudflare-hosted site to revalidate this slug + lists.
   const siteUrl = process.env.SITE_URL;
