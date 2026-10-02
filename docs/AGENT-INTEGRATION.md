@@ -55,14 +55,31 @@ Publish by **id or slug**. Enforces the daily cap and sets `recheckAfter`.
 ### `GET /api/v1/articles?status=&type=&limit=`
 List articles (id, slug, title, type, status, confidence, timestamps).
 
+### `GET /api/v1/search?q=&type=&limit=`
+Keyword search over published titles and excerpts (case-insensitive).
+Returns `{ query, articles }`. `400` when `q` is missing or `type` is not a
+valid article type.
+
+### `POST /api/v1/articles/similar`
+Semantic dedupe: body `{ embedding: number[1536], limit?, threshold? }`.
+Cosine nearest-neighbour search over `articles.embedding` (HNSW-indexed)
+restricted to published articles. `threshold` is a minimum cosine similarity —
+`0.9` is roughly "near-duplicate". Returns `{ threshold, articles }` where each
+row carries a `similarity` score.
+
+**Run this before drafting**, not after: it is the only check that catches a
+near-duplicate phrased differently from what `GET /context`'s recent titles show.
+
 ### `POST /api/v1/glossary`
 Upsert a term: `{ termAr, termEn, definitionAr, slug?, sourceUrl?, embedding? }`.
+Responds `{ ok, term: { id, slug, termAr, termEn } }`.
 
 ### `POST /api/v1/corrections`
 Log a correction: `{ articleId | slug, whatChanged, publishedNote? }`.
 
 ### `GET /api/v1/health`
-Article counts + the 20 most recent audit events.
+Article counts, configuration validation issues (`config.issues` — empty when
+the environment is valid), and the 20 most recent audit events.
 
 ## MCP tools
 
@@ -77,9 +94,16 @@ Connect any MCP client to `${SITE_URL}/api/mcp`:
 | `update_article` | `PATCH /articles/{id}` |
 | `publish_article` | `POST /articles/{id}/publish` |
 | `list_articles` | `GET /articles` |
+| `search_articles` | `GET /search` |
+| `find_similar_articles` | `POST /articles/similar` |
 | `upsert_glossary` | `POST /glossary` |
 | `submit_correction` | `POST /corrections` |
 | `health` | `GET /health` |
+
+Every tool validates with the **same Zod schema** the REST route uses
+(`src/lib/schemas.ts`), so the two interfaces cannot drift: a payload rejected
+over REST is rejected identically over MCP, including the length limits, the
+`slug` pattern, and `recheckAfter` on `create_article`.
 
 ### Example: Hermes / OpenClaw MCP config
 
@@ -108,3 +132,20 @@ plain Streamable-HTTP MCP server.)
 - Revalidation (`/news/{slug}`, `/news`, `/`, tag `articles`) on publish, plus an
   optional IndexNow ping.
 - Every mutation appends a row to `audit_log`.
+- The daily publish cap is enforced on **every** path that can set an article to
+  `published`: `POST /articles` with `status: "published"`,
+  `POST /articles/{id}/publish`, and a human `approve` in the review queue.
+
+## Human review
+
+`/admin/review` is the queue. It authenticates with the admin key, exchanged for
+an HttpOnly session cookie:
+
+1. The reviewer posts `ADMIN_API_KEY` to `POST /api/admin/session`
+   (form post → `303` back to `/admin/review`, or JSON → `{ ok: true }`).
+2. The cookie (`woklaa_admin_session`, HttpOnly, SameSite=Strict, 8h) then
+   authenticates `GET /api/admin/review` and `POST /api/admin/review`.
+3. `DELETE /api/admin/session` ends the session.
+
+The key is **never** accepted from the query string — that is the whole point of
+this flow; a `?key=` URL leaks into browser history, referrers, and access logs.

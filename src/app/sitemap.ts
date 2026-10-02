@@ -2,16 +2,20 @@ import type { MetadataRoute } from "next";
 import { db, articles, glossaryTerms } from "@/db";
 import { desc, eq } from "drizzle-orm";
 
+/** Used only when SITE_URL is absent (e.g. a build-time crawl). */
+const FALLBACK_SITE_URL = "https://ai-agents-arabia.osotrad101.workers.dev";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = process.env.SITE_URL ?? "https://ai-agents-arabia.osotrad101.workers.dev";
+  const base = process.env.SITE_URL ?? FALLBACK_SITE_URL;
 
   const statics: MetadataRoute.Sitemap = [
     { url: base, changeFrequency: "hourly", priority: 1 },
     { url: `${base}/news`, changeFrequency: "hourly", priority: 0.9 },
     { url: `${base}/glossary`, changeFrequency: "daily", priority: 0.8 },
-    { url: `${base}/how-it-works`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${base}/standards`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/corrections`, changeFrequency: "weekly", priority: 0.4 },
-    { url: `${base}/editor`, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${base}/about`, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${base}/sources`, changeFrequency: "weekly", priority: 0.5 },
   ];
 
   try {
@@ -25,6 +29,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const terms = await db
       .select({ slug: glossaryTerms.slug })
       .from(glossaryTerms)
+      .where(eq(glossaryTerms.published, true))
       .limit(1000);
 
     return [

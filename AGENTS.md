@@ -15,10 +15,13 @@ Prefer MCP tools if your host supports MCP; otherwise use REST with `curl`/fetch
 
 1. `GET /api/v1/context` (or MCP `get_context`) — read the editorial policy,
    current counts, and **recent titles** (use these to avoid duplicates).
-2. Gather ≥2 independent sources per news item.
-3. `POST /api/v1/articles/validate` (or `validate_article`) — dry run.
-4. `POST /api/v1/articles` (or `create_article`) — create the article.
-5. Publish: `POST /api/v1/articles/{id}/publish` (or `publish_article`).
+2. Check for duplicates: `search_articles` by keyword, and
+   `find_similar_articles` with the candidate article's 1536-dim embedding
+   (`threshold: 0.9` ≈ near-duplicate). Titles alone miss reworded copies.
+3. Gather ≥2 independent sources per news item.
+4. `POST /api/v1/articles/validate` (or `validate_article`) — dry run.
+5. `POST /api/v1/articles` (or `create_article`) — create the article.
+6. Publish: `POST /api/v1/articles/{id}/publish` (or `publish_article`).
 
 ## 3. Hard rules
 
@@ -27,8 +30,9 @@ Prefer MCP tools if your host supports MCP; otherwise use REST with `curl`/fetch
   excerpt. Warnings are returned but do not block — treat them as red flags.
 - Write original Arabic analysis; do **not** translate literally.
 - `slug` is short English, lowercase-with-hyphens.
-- The server enforces a **daily publish cap** (`DAILY_PUBLISH_CAP`, default 5) and
-  returns `429` when exceeded.
+- The server enforces a **daily publish cap** (`DAILY_PUBLISH_CAP`, default 5)
+  and returns `429` when exceeded. This includes the human review queue's
+  approve path — approval is not an exemption.
 
 ## 4. Article payload
 
@@ -42,19 +46,26 @@ Prefer MCP tools if your host supports MCP; otherwise use REST with `curl`/fetch
   "status": "pending_review",
   "sources": [{ "url": "https://…", "title": "…", "excerpt": "…" }],
   "claims": [{ "claim": "…", "sourceIndex": 0 }],
-  "confidenceScore": 0.8
+  "confidenceScore": 0.8,
+  "embedding": [/* 1536 floats, optional but enables semantic dedupe */]
 }
 ```
 
 `status` may be `draft`, `pending_review` (default), or `published`.
 `type` is one of `news`, `summary`, `explainer`, `review`, `glossary`.
 
+REST and MCP validate against the same schema — a payload one rejects, the other
+rejects too.
+
 ## 5. Other operations
 
 - Glossary: `POST /api/v1/glossary`
 - Corrections: `POST /api/v1/corrections`
+- Keyword search: `GET /api/v1/search?q=`
+- Semantic dedupe: `POST /api/v1/articles/similar`
 - Existing content: `GET /api/v1/articles?status=published&limit=50`
-- Health: `GET /api/v1/health`
+- Health: `GET /api/v1/health` (includes `config.issues` — check it if a write
+  behaves unexpectedly)
 
 ## 6. Notes
 

@@ -19,7 +19,7 @@ export async function POST(req: Request) {
           id: term.id,
           slug: term.slug,
           termAr: term.termAr,
-          dominant: term.termEn,
+          termEn: term.termEn,
         },
       },
       201,

@@ -60,11 +60,41 @@ body {
   }
 }
 
-/* Arabic article prose */
-.prose-ar p { margin-bottom: 1.25em; }
-.prose-ar h2 { font-size: 1.5rem; font-weight: 700; margin: 1.75em 0 0.75em; }
-.prose-ar h3 { font-size: 1.2rem; font-weight: 600; margin: 1.5em 0 0.5em; }
-.prose-ar ul, .prose-ar ol { padding-inline-start: 1.5em; margin-bottom: 1.25em; }
-.prose-ar li { margin-bottom: 0.4em; }
+/* Arabic article prose — tuned for the narrower reading column. */
+.prose-ar > *:first-child { margin-top: 0; }
+.prose-ar p { margin-bottom: 1.35em; }
+.prose-ar h2 { font-size: 1.5rem; font-weight: 700; margin: 2em 0 0.7em; line-height: 1.4; }
+.prose-ar h3 { font-size: 1.2rem; font-weight: 600; margin: 1.6em 0 0.5em; line-height: 1.5; }
+.prose-ar h4 { font-size: 1.05rem; font-weight: 600; margin: 1.4em 0 0.4em; }
+.prose-ar ul, .prose-ar ol { padding-inline-start: 1.5em; margin-bottom: 1.35em; }
+.prose-ar li { margin-bottom: 0.5em; }
+.prose-ar li::marker { color: var(--signal); }
 .prose-ar a { color: var(--signal); text-decoration: underline; text-underline-offset: 3px; }
-.prose-ar strong { color: var(--paper); }
+.prose-ar strong { color: var(--paper); font-weight: 600; }
+.prose-ar blockquote {
+  border-inline-start: 2px solid var(--signal);
+  padding-inline-start: 1rem;
+  margin: 1.5em 0;
+  color: var(--paper-dim);
+}
+.prose-ar code {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.85em;
+  background: var(--ink-raise);
+  border: 1px solid var(--ink-line);
+  padding: 0.1em 0.35em;
+}
+.prose-ar pre {
+  background: var(--ink-raise);
+  border: 1px solid var(--ink-line);
+  padding: 1rem;
+  overflow-x: auto;
+  margin-bottom: 1.5em;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+.prose-ar pre code { background: none; border: 0; padding: 0; }
+.prose-ar table { width: 100%; border-collapse: collapse; margin-bottom: 1.5em; font-size: 0.95em; }
+.prose-ar th, .prose-ar td { border: 1px solid var(--ink-line); padding: 0.5rem 0.75rem; text-align: start; }
+.prose-ar th { background: var(--ink-raise); font-weight: 600; }
+.prose-ar hr { border: 0; border-top: 1px solid var(--ink-line); margin: 2.5em 0; }

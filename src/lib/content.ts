@@ -13,6 +13,7 @@ import { sha256Hex } from "./hash";
 import { recordAudit, type AuditActor } from "./audit";
 import { revalidateArticle, revalidateGlossary } from "./revalidate";
 import { pingIndexNow } from "./indexnow";
+import { envIssues, publishCap, siteUrl } from "./env";
 import type {
   ArticleInput,
   ArticlePatch,
@@ -179,7 +180,7 @@ async function upsertSources(
 }
 
 async function assertPublishCap(): Promise<void> {
-  const cap = Number(process.env.DAILY_PUBLISH_CAP ?? 5);
+  const cap = publishCap();
   const res = await db.execute(
     sql`SELECT count(*)::int AS n FROM articles WHERE status='published' AND published_at > now() - interval '24 hours'`,
   );
@@ -473,6 +474,89 @@ async function scalarCount(query: ReturnType<typeof sql>): Promise<number> {
   return rows[0]?.n ?? 0;
 }
 
+/** Serialize an embedding for a pgvector cast — the DB rejects stray spaces. */
+export function toVectorLiteral(embedding: number[]): string {
+  return `[${embedding.map((n) => (Number.isFinite(n) ? n : 0)).join(",")}]`;
+}
+
+export interface SimilarArticle {
+  id: string;
+  slug: string;
+  titleAr: string;
+  type: string;
+  publishedAt: Date | null;
+  similarity: number;
+}
+
+/**
+ * Cosine nearest-neighbour search over `articles.embedding` (HNSW-indexed).
+ * The agent calls this before drafting to avoid semantically duplicating an
+ * article that already exists under different wording.
+ */
+export async function findSimilarArticles(opts: {
+  embedding: number[];
+  limit?: number;
+  /** Minimum cosine similarity to report; 0.9 ≈ near-duplicate. */
+  threshold?: number;
+}): Promise<SimilarArticle[]> {
+  const limit = Math.min(Math.max(opts.limit ?? 5, 1), 25);
+  const threshold = opts.threshold ?? 0;
+  const literal = toVectorLiteral(opts.embedding);
+
+  const res = await db.execute(sql`
+    SELECT id::text AS id,
+           slug,
+           title_ar AS "titleAr",
+           type::text AS type,
+           published_at AS "publishedAt",
+           (1 - (embedding <=> ${literal}::vector))::float AS similarity
+    FROM articles
+    WHERE status = 'published'
+      AND embedding IS NOT NULL
+      AND (1 - (embedding <=> ${literal}::vector)) >= ${threshold}
+    ORDER BY embedding <=> ${literal}::vector
+    LIMIT ${limit}
+  `);
+
+  const rows =
+    (res as unknown as { rows?: SimilarArticle[] }).rows ??
+    (res as unknown as SimilarArticle[]);
+  return rows ?? [];
+}
+
+/** Keyword search across published titles and excerpts (public site search). */
+export async function searchArticles(opts: {
+  q: string;
+  type?: string;
+  limit?: number;
+}) {
+  const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50);
+  const q = opts.q.trim();
+  if (!q) return [];
+  const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  const typeFilter =
+    opts.type && opts.type !== "all"
+      ? sql`AND type = ${opts.type}::article_type`
+      : sql``;
+
+  return db
+    .select({
+      slug: articles.slug,
+      titleAr: articles.titleAr,
+      excerptAr: articles.excerptAr,
+      type: articles.type,
+      publishedAt: articles.publishedAt,
+    })
+    .from(articles)
+    .where(
+      sql`status = 'published'
+          AND (title_ar ILIKE ${pattern} OR excerpt_ar ILIKE ${pattern})
+          ${typeFilter}`,
+    )
+    .orderBy(desc(articles.publishedAt))
+    .limit(limit);
+}
+
 /** Bootstrap payload the agent fetches before each run. */
 export async function getSiteContext() {
   const counts = {
@@ -502,8 +586,8 @@ export async function getSiteContext() {
     .limit(40);
 
   return {
-    site: process.env.SITE_URL ?? "http://localhost:3000",
-    publishCap: Number(process.env.DAILY_PUBLISH_CAP ?? 5),
+    site: siteUrl(),
+    publishCap: publishCap(),
     allowedTypes: ["news", "summary", "explainer", "review", "glossary"],
     counts,
     recentTitles,
@@ -534,6 +618,7 @@ export async function getHealth() {
 
   return {
     articles: { published, pendingReview, needsRecheck },
+    config: { issues: envIssues() },
     recentAudit,
   };
 }
@@ -552,18 +637,38 @@ export const GUIDELINES = `# سياسة النشر — وكلاء
 5. الـ slug إنجليزي قصير، أحرف صغيرة وشرطات فقط.
 
 ## سير العمل
+- اقرأ GET /api/v1/context أولًا: السياسة، الأعداد، وعناوين آخر 40 مقالًا.
+- قبل الصياغة، ابحث عن تكرار محتمل: find_similar_articles (بحث متجهي) أو search_articles.
 - أنشئ المقال عبر POST /api/v1/articles بحالة pending_review أو draft.
 - استخدم POST /api/v1/articles/validate للتحقق قبل الإنشاء.
 - النشر: POST /api/v1/articles/{id}/publish أو أنشئ بحالة published.
-- حد النشر اليومي مفروض من الخادم؛ عند التجاوز يعيد 429.
+- حد النشر اليومي مفروض من الخادم على كل مسار نشر — بما فيه موافقة المحرر البشري؛ عند التجاوز يعيد 429.
 `;
 
-/** Full rows awaiting human review, newest first. */
-export async function listPendingReview(limit = 50) {
+/** Statuses a reviewer may inspect in the queue. */
+export const REVIEWABLE_STATUSES = [
+  "pending_review",
+  "draft",
+  "needs_recheck",
+  "published",
+  "archived",
+] as const;
+
+export type ReviewableStatus = (typeof REVIEWABLE_STATUSES)[number];
+
+export function isReviewableStatus(value: string): value is ReviewableStatus {
+  return (REVIEWABLE_STATUSES as readonly string[]).includes(value);
+}
+
+/** Full rows awaiting a review decision (default: pending_review), newest first. */
+export async function listReviewQueue(
+  opts: { status?: ReviewableStatus; limit?: number } = {},
+) {
+  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
   return db
     .select()
     .from(articles)
-    .where(eq(articles.status, "pending_review"))
+    .where(eq(articles.status, opts.status ?? "pending_review"))
     .orderBy(desc(articles.createdAt))
     .limit(limit);
 }
@@ -599,6 +704,10 @@ export async function reviewArticle(
     });
     return { status: "archived" as const, slug: a.slug };
   }
+
+  // Human approval still publishes, so it is subject to the same cap as any
+  // other write path — otherwise the queue becomes a cap bypass.
+  await assertPublishCap();
 
   const updates: Record<string, unknown> = {
     status: "published",

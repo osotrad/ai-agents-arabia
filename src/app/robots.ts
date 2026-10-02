@@ -1,11 +1,16 @@
 import type { MetadataRoute } from "next";
+import { siteUrl } from "@/lib/env";
 
 export default function robots(): MetadataRoute.Robots {
-  const base = process.env.SITE_URL ?? "https://ai-agents-arabia.osotrad101.workers.dev";
   return {
     rules: [
-      { userAgent: "*", allow: "/", disallow: ["/admin", "/api/"] },
+      {
+        userAgent: "*",
+        allow: "/",
+        // /search is a query-driven surface — useful for visitors, noise for crawlers.
+        disallow: ["/admin", "/api/", "/search"],
+      },
     ],
-    sitemap: `${base}/sitemap.xml`,
+    sitemap: `${siteUrl()}/sitemap.xml`,
   };
 }

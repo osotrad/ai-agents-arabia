@@ -17,9 +17,12 @@ The وكلاء site is headless: you create and publish content through its API.
 1. Read context: `GET {base}/context` — policy, counts, and recent titles
    (for dedupe).
 2. Draft an Arabic article grounded in **≥2 independent sources**.
-3. Validate: `POST {base}/articles/validate`.
-4. Create: `POST {base}/articles`.
-5. Publish: `POST {base}/articles/{id}/publish`.
+3. Check for near-duplicates before creating:
+   `POST {base}/articles/similar` with the draft's 1536-dim embedding
+   (`threshold: 0.9`), or `GET {base}/search?q=`.
+4. Validate: `POST {base}/articles/validate`.
+5. Create: `POST {base}/articles`.
+6. Publish: `POST {base}/articles/{id}/publish`.
 
 ## Rules that will fail your request
 
@@ -35,3 +38,5 @@ The وكلاء site is headless: you create and publish content through its API.
 - Prefer `status: "pending_review"` for long-form content; the human editor
   approves it. Use `published` only for short, well-sourced news.
 - Markdown is sanitized server-side; don't rely on raw HTML.
+- The MCP tools validate with the same schemas as REST — a payload one rejects,
+  the other rejects identically.

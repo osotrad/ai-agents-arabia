@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Arabic, IBM_Plex_Mono, Sora } from "next/font/google";
 import { SiteHeader, SiteFooter } from "@/components/site";
+import { siteName, siteUrl } from "@/lib/env";
 import "./globals.css";
 
 const plexArabic = IBM_Plex_Sans_Arabic({
@@ -22,13 +23,25 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(siteUrl()),
   title: {
     default: "وكلاء — ذكاء اصطناعي بالعربية",
     template: "%s — وكلاء",
   },
   description:
-    "موقع عربي متخصص في وكلاء الذكاء الاصطناعي: أخبار، مصطلحات، وشروحات بتحليل عربي أصيل.",
+    "موقع عربي متخصص في وكلاء الذكاء الاصطناعي: أخبار، مصطلحات، وشروحات بتحليل عربي أصيل — كل مادة بمصادرها.",
+  applicationName: siteName(),
+  openGraph: {
+    type: "website",
+    locale: "ar_AR",
+    siteName: siteName(),
+  },
+  twitter: { card: "summary_large_image" },
+  alternates: {
+    types: {
+      "application/rss+xml": [{ url: "/feed.xml", title: "وكلاء" }],
+    },
+  },
 };
 
 export default function RootLayout({

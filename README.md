@@ -1,9 +1,9 @@
 # وكلاء — ai-agents-arabia
 
-An Arabic-language AI-agents news site that is **website-only**: it exposes a
-clean content API (REST + MCP) so an already-configured external agent
-(Hermes, OpenClaw, or any HTTP/MCP-capable agent) can discover, write, and
-publish content. No agent runtime lives in this repo.
+An Arabic-language AI-agents site. It exposes a clean content API (REST + MCP)
+so content is written and published through a documented, verifiable pipeline:
+every article carries its sources, every number is checked against a stored
+excerpt, and every change is recorded. No agent runtime lives in this repo.
 
 ## Stack
 
@@ -48,25 +48,42 @@ See **[AGENTS.md](./AGENTS.md)** (operating manual) and
 | PATCH | `/api/v1/articles/{id}` | Edit (body edits create a revision) |
 | POST | `/api/v1/articles/{id}/publish` | Publish by id or slug |
 | GET | `/api/v1/articles` | List |
+| GET | `/api/v1/search?q=` | Keyword search over published articles |
+| POST | `/api/v1/articles/similar` | pgvector cosine search (semantic dedupe) |
 | POST | `/api/v1/glossary` | Upsert a glossary term |
 | POST | `/api/v1/corrections` | Log a correction |
-| GET | `/api/v1/health` | Counts + recent audit events |
-| POST/GET | `/api/mcp` | MCP Streamable HTTP (tools) |
+| GET | `/api/v1/health` | Counts, config issues, recent audit events |
+| POST/GET | `/api/mcp` | MCP Streamable HTTP (12 tools) |
+
+The REST routes and the MCP tools share one set of Zod schemas, so validation
+cannot drift between the two interfaces.
 
 Also public: `/llms.txt`, `/feed.xml`, `/sitemap.xml`, `/robots.txt`.
 
+## Pages
+
+- `/` — homepage: live counts, latest material, editorial guarantees
+- `/news`, `/news/{slug}` — articles, filterable by type, each with its sources
+- `/glossary`, `/glossary/{slug}` — filterable Arabic–English glossary
+- `/search?q=` — site search
+- `/sources` — every cited domain and how many articles rely on it
+- `/standards` — publishing standards
+- `/corrections` — corrections policy and public log
+- `/about` — about this site
+
 ## Editorial transparency
 
-- `/how-it-works` — how publishing works
+- `/standards` — publishing standards and auto-publish limits
 - `/corrections` — public corrections log
-- `/editor` — the accountable human editor
-- `/admin/review` — human review queue (`?key=<ADMIN_API_KEY>`)
+- `/sources` — the source ledger (every cited domain, citation count)
+- `/about` — scope of what is published, and how to reach us
 
 ## Human review
 
-Drafts created with `status: "pending_review"` appear at `/admin/review`.
-Approve (optionally with edits) or reject via the header-authenticated
-`POST /api/admin/review`.
+Articles created with `status: "pending_review"` appear at `/admin/review`.
+Log in by posting `ADMIN_API_KEY` to `POST /api/admin/session`, which sets an
+HttpOnly session cookie — the key never travels in a URL. Approve (optionally
+with edits) or reject via the cookie-authenticated `POST /api/admin/review`.
 
 ## Deploy
 

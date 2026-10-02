@@ -4,12 +4,15 @@ import {
 } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { mcpAuthInfo } from "@/lib/auth";
+import { siteUrl } from "@/lib/env";
 import {
   createArticle,
+  findSimilarArticles,
   getSiteContext,
   getHealth,
   listArticles,
   publishArticle,
+  searchArticles,
   submitCorrection,
   updateArticle,
   upsertGlossary,
@@ -17,56 +20,40 @@ import {
   GUIDELINES,
   type ContentError,
 } from "@/lib/content";
-import type {
-  ArticleInput,
-  GlossaryInput,
-  CorrectionInput,
+import {
+  articleInputSchema,
+  articlePatchSchema,
+  articleTypeSchema,
+  correctionInputSchema,
+  embeddingSchema,
+  glossaryInputSchema,
+  type ArticlePatch,
 } from "@/lib/schemas";
 
 export const dynamic = "force-dynamic";
 
-// ---------- tool input schemas ----------
-const sourceSchema = z.object({
-  url: z.string().url(),
-  title: z.string().optional(),
-  excerpt: z.string().optional(),
+// The MCP tools reuse the exact schemas the REST API validates with, so the two
+// interfaces can never drift apart again.
+const mcpUpdateArticleSchema = articlePatchSchema.extend({
+  id: z.string().min(1, "article id is required"),
 });
-const claimSchema = z.object({
-  claim: z.string(),
-  sourceIndex: z.number().int().min(0),
+const listArticlesSchema = z.object({
+  status: z
+    .enum(["draft", "pending_review", "published", "needs_recheck", "archived"])
+    .optional(),
+  type: articleTypeSchema.optional(),
+  limit: z.number().int().min(1).max(100).optional(),
 });
-const createArticleSchema = z.object({
-  titleAr: z.string().min(5),
-  excerptAr: z.string().optional(),
-  bodyMd: z.string().min(80),
-  type: z.enum(["news", "summary", "explainer", "review", "glossary"]).default("news"),
-  slug: z.string().optional(),
-  status: z.enum(["draft", "pending_review", "published"]).default("pending_review"),
-  sources: z.array(sourceSchema).default([]),
-  claims: z.array(claimSchema).default([]),
-  confidenceScore: z.number().min(0).max(1).optional(),
-  embedding: z.array(z.number()).length(1536).optional(),
+const similarSchema = z.object({
+  embedding: embeddingSchema,
+  limit: z.number().int().min(1).max(25).optional(),
+  /** Minimum cosine similarity to report; 0.9 ≈ near-duplicate. */
+  threshold: z.number().min(-1).max(1).optional(),
 });
-const updateArticleSchema = z.object({
-  id: z.string(),
-  titleAr: z.string().min(5).optional(),
-  excerptAr: z.string().optional(),
-  bodyMd: z.string().min(80).optional(),
-  reason: z.string().optional(),
-});
-const glossarySchema = z.object({
-  termAr: z.string().min(2),
-  termEn: z.string().min(2),
-  slug: z.string().optional(),
-  definitionAr: z.string().min(20),
-  sourceUrl: z.string().url().optional(),
-  embedding: z.array(z.number()).length(1536).optional(),
-});
-const correctionSchema = z.object({
-  articleId: z.string().uuid().optional(),
-  slug: z.string().optional(),
-  whatChanged: z.string().min(5),
-  publishedNote: z.string().optional(),
+const searchSchema = z.object({
+  q: z.string().min(1),
+  type: articleTypeSchema.optional(),
+  limit: z.number().int().min(1).max(50).optional(),
 });
 
 function text(value: unknown) {
@@ -81,7 +68,12 @@ function text(value: unknown) {
 }
 
 function toolError(err: unknown) {
-  if (err && typeof err === "object" && "name" in err && (err as ContentError).name === "ContentError") {
+  if (
+    err &&
+    typeof err === "object" &&
+    "name" in err &&
+    (err as ContentError).name === "ContentError"
+  ) {
     const ce = err as ContentError;
     return {
       isError: true,
@@ -103,7 +95,10 @@ function registerTools(server: McpServer) {
 
   server.registerTool(
     "get_context",
-    { description: "Bootstrap payload: guidelines, counts, recent titles. Call before each run." },
+    {
+      description:
+        "Bootstrap payload: guidelines, counts, recent titles. Call before each run.",
+    },
     async () => {
       try {
         return text(await getSiteContext());
@@ -121,10 +116,13 @@ function registerTools(server: McpServer) {
 
   server.registerTool(
     "validate_article",
-    { description: "Dry-run validation of an article (no write).", inputSchema: createArticleSchema },
+    {
+      description: "Dry-run validation of an article (no write).",
+      inputSchema: articleInputSchema,
+    },
     async (args) => {
       try {
-        return text(validateArticleInput(args as unknown as ArticleInput));
+        return text(validateArticleInput(args));
       } catch (e) {
         return toolError(e);
       }
@@ -136,11 +134,11 @@ function registerTools(server: McpServer) {
     {
       description:
         "Create an article. status defaults to pending_review; 'published' enforces the daily cap.",
-      inputSchema: createArticleSchema,
+      inputSchema: articleInputSchema,
     },
     async (args) => {
       try {
-        const r = await createArticle(args as unknown as ArticleInput, actor);
+        const r = await createArticle(args, actor);
         return text({
           ok: true,
           warnings: r.warnings,
@@ -159,11 +157,13 @@ function registerTools(server: McpServer) {
 
   server.registerTool(
     "update_article",
-    { description: "Patch an article by id; body edits create a revision.", inputSchema: updateArticleSchema },
-    async (args) => {
+    {
+      description: "Patch an article by id; body edits create a revision.",
+      inputSchema: mcpUpdateArticleSchema,
+    },
+    async ({ id, ...patch }) => {
       try {
-        const { id, ...patch } = args;
-        const a = await updateArticle(id, patch, actor);
+        const a = await updateArticle(id, patch as ArticlePatch, actor);
         return text({ ok: true, id: a.id, slug: a.slug, version: a.version });
       } catch (e) {
         return toolError(e);
@@ -173,7 +173,10 @@ function registerTools(server: McpServer) {
 
   server.registerTool(
     "publish_article",
-    { description: "Publish a draft by id or slug.", inputSchema: z.object({ idOrSlug: z.string() }) },
+    {
+      description: "Publish a draft by id or slug (subject to the daily cap).",
+      inputSchema: z.object({ idOrSlug: z.string().min(1) }),
+    },
     async ({ idOrSlug }) => {
       try {
         const a = await publishArticle(idOrSlug, actor);
@@ -188,11 +191,7 @@ function registerTools(server: McpServer) {
     "list_articles",
     {
       description: "List articles for dedupe/awareness.",
-      inputSchema: z.object({
-        status: z.string().optional(),
-        type: z.string().optional(),
-        limit: z.number().int().min(1).max(100).optional(),
-      }),
+      inputSchema: listArticlesSchema,
     },
     async (args) => {
       try {
@@ -204,12 +203,47 @@ function registerTools(server: McpServer) {
   );
 
   server.registerTool(
-    "upsert_glossary",
-    { description: "Create or update a glossary term.", inputSchema: glossarySchema },
+    "search_articles",
+    {
+      description:
+        "Keyword search over published titles and excerpts. Use before drafting to avoid duplicates.",
+      inputSchema: searchSchema,
+    },
     async (args) => {
       try {
-        const t = await upsertGlossary(args as unknown as GlossaryInput, actor);
-        return text({ ok: true, slug: t.slug });
+        return text({ articles: await searchArticles(args) });
+      } catch (e) {
+        return toolError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "find_similar_articles",
+    {
+      description:
+        "Cosine nearest-neighbour search over article embeddings (semantic dedupe). Pass the candidate article's 1536-dim embedding; threshold 0.9 ≈ near-duplicate.",
+      inputSchema: similarSchema,
+    },
+    async (args) => {
+      try {
+        return text({ articles: await findSimilarArticles(args) });
+      } catch (e) {
+        return toolError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "upsert_glossary",
+    {
+      description: "Create or update a glossary term.",
+      inputSchema: glossaryInputSchema,
+    },
+    async (args) => {
+      try {
+        const t = await upsertGlossary(args, actor);
+        return text({ ok: true, id: t.id, slug: t.slug, termEn: t.termEn });
       } catch (e) {
         return toolError(e);
       }
@@ -218,10 +252,13 @@ function registerTools(server: McpServer) {
 
   server.registerTool(
     "submit_correction",
-    { description: "Log a public correction against an article.", inputSchema: correctionSchema },
+    {
+      description: "Log a public correction against an article.",
+      inputSchema: correctionInputSchema,
+    },
     async (args) => {
       try {
-        const c = await submitCorrection(args as unknown as CorrectionInput, actor);
+        const c = await submitCorrection(args, actor);
         return text({ ok: true, correctionId: c.id });
       } catch (e) {
         return toolError(e);
@@ -231,7 +268,10 @@ function registerTools(server: McpServer) {
 
   server.registerTool(
     "health",
-    { description: "Article counts + recent audit events." },
+    {
+      description:
+        "Article counts, config validation issues, and recent audit events.",
+    },
     async () => {
       try {
         return text(await getHealth());
@@ -256,13 +296,10 @@ function allowedOrigins(): string[] {
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8787",
   ];
-  const site = process.env.SITE_URL;
-  if (site) {
-    try {
-      origins.push(new URL(site).origin);
-    } catch {
-      /* ignore malformed SITE_URL */
-    }
+  try {
+    origins.push(new URL(siteUrl()).origin);
+  } catch {
+    /* unset or malformed SITE_URL — local origins only */
   }
   return origins;
 }
@@ -293,4 +330,3 @@ export async function POST(req: Request): Promise<Response> {
 export async function GET(req: Request): Promise<Response> {
   return serve(req);
 }
-
