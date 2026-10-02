@@ -1,0 +1,58 @@
+name: Agent API probe
+
+# Read-only probe against the site's own MCP + REST endpoints. Used to inspect
+# a deployed instance (health, context, schema state) without shell access to
+# *.workers.dev from the machine running this repository.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: "MCP tool to call"
+        required: true
+        default: health
+        type: string
+      arguments:
+        description: "Tool arguments as JSON (optional)"
+        required: false
+        default: "{}"
+        type: string
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      MCP_URL: ${{ vars.SITE_URL }}/api/mcp
+      API_KEY: ${{ secrets.AGENT_API_KEY }}
+
+    steps:
+      - name: Call tool
+        run: |
+          set -euo pipefail
+          [ -n "${API_KEY:-}" ] || { echo "::error::AGENT_API_KEY is not set"; exit 1; }
+          body=$(python3 -c '
+          import json, sys
+          print(json.dumps({"jsonrpc":"2.0","id":1,"method":"tools/call",
+                            "params":{"name":sys.argv[1],"arguments":json.loads(sys.argv[2])}}))
+          ' '${{ inputs.tool }}' '${{ inputs.arguments }}')
+          code=$(curl -sS -m 60 -o resp.sse -w '%{http_code}' \
+            -X POST "$MCP_URL" \
+            -H "Authorization: Bearer $API_KEY" \
+            -H "content-type: application/json" \
+            -H "accept: application/json, text/event-stream" \
+            -d "$body")
+          echo "HTTP $code"
+          [ "$code" = "200" ] || { cat resp.sse; exit 1; }
+          sed -n 's/^data: //p' resp.sse > resp.json
+          python3 -c '
+          import json
+          r = json.load(open("resp.json"))
+          res = r.get("result", {})
+          text = res.get("content", [{}])[0].get("text", "")
+          try:
+              print(json.dumps(json.loads(text), ensure_ascii=False, indent=2))
+          except Exception:
+              print(text)
+          raise SystemExit(1 if res.get("isError") else 0)
+          '
