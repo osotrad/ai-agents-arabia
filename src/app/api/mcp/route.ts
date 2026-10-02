@@ -85,8 +85,22 @@ function toolError(err: unknown) {
       ],
     };
   }
+  // Drizzle/Neon wrap the database error in `cause`, and the wrapper's message
+  // ("Failed query: …") never states what the database objected to. Surface the
+  // driver's own code + message so a failed write is diagnosable from the
+  // caller's side; the query text and parameters stay in the server log.
+  const driver = (err as { cause?: { code?: unknown; message?: unknown } })?.cause;
+  const detail =
+    driver && (typeof driver.code === "string" || typeof driver.message === "string")
+      ? { driver: { code: driver.code, message: driver.message } }
+      : {};
   const message = err instanceof Error ? err.message : String(err);
-  return { isError: true, content: [{ type: "text" as const, text: message }] };
+  return {
+    isError: true,
+    content: [
+      { type: "text" as const, text: JSON.stringify({ error: message, ...detail }) },
+    ],
+  };
 }
 
 /** Register the content-management tools the external agent can call. */
