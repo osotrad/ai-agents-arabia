@@ -37,11 +37,11 @@ jobs:
             || { echo "::error::cookie is not HttpOnly"; exit 1; }
           echo "   cookie is HttpOnly ✓"
 
-          jar="cookies.txt"
-          grep -i '^set-cookie:' headers.txt | sed 's/^[Ss]et-[Cc]ookie: //' | cut -d';' -f1 > "$jar"
+          jar=$(grep -i '^set-cookie:' headers.txt | sed 's/^[Ss]et-[Cc]ookie: //' | cut -d';' -f1 | tr -d '\r')
+          [ -n "$jar" ] || { echo "::error::no cookie in the response"; exit 1; }
 
           echo "3. queue read with the cookie"
-          code=$(curl -sS -m 30 -b "$jar" -o queue.json -w '%{http_code}' \
+          code=$(curl -sS -m 30 -H "Cookie: $jar" -o queue.json -w '%{http_code}' \
             "$BASE/api/admin/review?status=pending_review&limit=5")
           echo "   GET /api/admin/review?status=pending_review -> $code"
           [ "$code" = "200" ] || { echo "::error::queue read failed"; exit 1; }
@@ -54,7 +54,7 @@ jobs:
           "
 
           echo "4. review page renders with the cookie"
-          code=$(curl -sS -m 30 -b "$jar" -o page.html -w '%{http_code}' "$BASE/admin/review")
+          code=$(curl -sS -m 30 -H "Cookie: $jar" -o page.html -w '%{http_code}' "$BASE/admin/review")
           echo "   GET /admin/review -> $code"
           [ "$code" = "200" ] || { echo "::error::review page failed"; exit 1; }
           grep -q 'قائمة المراجعة' page.html \
