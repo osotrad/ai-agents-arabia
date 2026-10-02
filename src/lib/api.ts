@@ -16,6 +16,24 @@ export function caller(req: Request): Actor | null {
   return authenticateAgent(req);
 }
 
+/**
+ * Unwrap the reason a driver error actually failed. Drizzle/Neon wrap the
+ * Postgres error in `cause`, and the wrapper's own message ("Failed query: …")
+ * never says what the database complained about — which makes a migration or
+ * schema mismatch nearly impossible to diagnose from a Worker log.
+ */
+function describeCause(err: unknown, depth = 0): string[] {
+  if (!err || typeof err !== "object" || depth > 3) return [];
+  const e = err as { cause?: unknown; message?: unknown; code?: unknown };
+  const out: string[] = [];
+  if (typeof e.code === "string") out.push(`code=${e.code}`);
+  if (typeof e.message === "string") out.push(e.message);
+  if (e.cause) {
+    out.push(...describeCause(e.cause, depth + 1));
+  }
+  return out;
+}
+
 /** Convert thrown errors into API responses. */
 export function errorResponse(err: unknown): NextResponse {
   if (err instanceof ContentError) {
@@ -25,7 +43,8 @@ export function errorResponse(err: unknown): NextResponse {
     );
   }
   const message = err instanceof Error ? err.message : String(err);
-  console.error("[api] unhandled error:", message);
+  const cause = describeCause(err);
+  console.error("[api] unhandled error:", message, ...cause);
   return NextResponse.json({ error: "internal error" }, { status: 500 });
 }
 
