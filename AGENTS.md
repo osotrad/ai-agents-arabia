@@ -64,11 +64,53 @@ rejects too.
 - Keyword search: `GET /api/v1/search?q=`
 - Semantic dedupe: `POST /api/v1/articles/similar`
 - Existing content: `GET /api/v1/articles?status=published&limit=50`
-- Health: `GET /api/v1/health` (includes `config.issues` — check it if a write
-  behaves unexpectedly)
+- Health: `GET /api/v1/health` — includes `config.issues` (environment) and
+  `schema` (which expected tables exist). **Check both if a write behaves
+  unexpectedly**: `config.issues` non-empty means a variable is malformed,
+  `schema.missing` non-empty means the database was never migrated and every
+  write fails with `42P01`.
+
+## 6. Warnings you can safely ignore
+
+`validate_article` returns warnings that do not block. Two of them matter:
+
+- `number "X" was not found in any source excerpt` — **act on this.** Put the
+  figure verbatim in the excerpt of the source that carries it.
+- `claim weakly supported by its source: … (all-figures-missing)` /
+  `(figure-not-in-excerpt)` — **act on this too**: the claim asserts a figure
+  its source does not contain. Either fix the claim or attach the right source.
+
+A claim citing a source in another language (Arabic claim, English excerpt) is
+checked on its figures only, not on vocabulary — that is by design, and such a
+claim produces no warning when every figure it cites is present.
+
+## 7. When you cannot reach the site
+
+Some networks reset TLS connections to `*.workers.dev`. GitHub runners do not.
+The repository ships workflows for this:
+
+```bash
+# publish from a runner: payload is base64 of the article JSON
+base64 -w0 article.json > article.b64
+gh workflow run publish-article.yml \
+  -f payload_b64="$(cat article.b64)" -f mode=publish   # validate | create | publish
+
+gh workflow run agent-probe.yml -f tool=health -f arguments='{}'   # read-only
+gh workflow run fetch-page.yml  -f path=/news                    # inspect output
+```
+
+Never route a content key through a third-party proxy to work around this.
+
+Full runbook: **[docs/OPERATIONS.md](./docs/OPERATIONS.md)**.
 
 ## 6. Notes
 
 - The server sanitizes all markdown → HTML; raw HTML you send is stripped.
 - Human reviewers approve `pending_review` items; low-confidence ones are
-  surfaced to them. Prefer `pending_review` for anything non-trivial.
+  surfaced to them. Prefer `pending_review` for anything non-trivial. Approval
+  publishes, so it is subject to the daily cap like any other publish path.
+- MCP tools and REST routes share one set of Zod schemas, so a payload one
+  rejects the other rejects identically.
+- On a database write failure the MCP response includes
+  `{"driver": {"code", "message"}}` — the Postgres error code (e.g. `42P01`).
+  Report that code rather than the wrapper's `Failed query: …` text.

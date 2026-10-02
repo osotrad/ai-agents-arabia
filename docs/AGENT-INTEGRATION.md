@@ -79,7 +79,44 @@ Log a correction: `{ articleId | slug, whatChanged, publishedNote? }`.
 
 ### `GET /api/v1/health`
 Article counts, configuration validation issues (`config.issues` — empty when
-the environment is valid), and the 20 most recent audit events.
+the environment is valid), the schema report (`schema` — `ok`, and any tables
+from `missing` that were never created), and the 20 most recent audit events.
+
+**Check `schema` first whenever a write fails.** A database that was never
+migrated still serves every page, because reads degrade to empty states — so
+the site looks healthy while every insert fails with `42P01`.
+
+## Validation semantics
+
+`validate_article` / `POST /articles/validate` returns `{ok, errors, warnings}`.
+Errors block the write; warnings do not.
+
+### Errors
+
+- `type: "news"` with fewer than 2 sources
+- claims supplied with no sources attached
+- a `claim.sourceIndex` beyond the end of `sources`
+
+### Warnings that require action
+
+- `number "X" was not found in any source excerpt` — put the figure verbatim
+  in the excerpt of the source that carries it.
+- `claim weakly supported by its source: … (all-figures-missing)` /
+  `(figure-not-in-excerpt)` — the claim asserts a figure its source does not
+  contain. Fix the claim or attach the right source.
+
+`assessClaimSupport()` in `src/lib/content.ts` decides this. It has two
+regimes, because lexical overlap is only meaningful when the claim and its
+excerpt are in the same script:
+
+| Claim vs excerpt | What is checked | Warning reasons |
+| --- | --- | --- |
+| same script | normalized word-set overlap (≥ 0.2), after folding case, Arabic tashkēl/tatweel, alef variants, `ة→ه`, `ى→ي` and the definite article | `no-lexical-overlap` |
+| different script | the figures the claim asserts — a claim saying `70%` must find `70%` in its excerpt | `figure-not-in-excerpt`, `all-figures-missing` |
+| different script, no figures | nothing comparable | none — returns `unverifiable` |
+
+So a well-grounded Arabic claim citing an English excerpt is clean, while an
+Arabic claim inventing a percentage is still caught.
 
 ## MCP tools
 
@@ -104,6 +141,20 @@ Every tool validates with the **same Zod schema** the REST route uses
 (`src/lib/schemas.ts`), so the two interfaces cannot drift: a payload rejected
 over REST is rejected identically over MCP, including the length limits, the
 `slug` pattern, and `recheckAfter` on `create_article`.
+
+### Errors from a failed write
+
+A database failure comes back as a tool-level error whose text includes the
+driver's own diagnosis:
+
+```json
+{ "error": "Failed query: insert into \"sources\" …", 
+  "driver": { "code": "42P01", "message": "relation \"sources\" does not exist" } }
+```
+
+Report `driver.code`. The wrapper message deliberately omits the query
+parameters. `42P01` means the schema is behind the code — see
+[OPERATIONS.md](./OPERATIONS.md).
 
 ### Example: Hermes / OpenClaw MCP config
 
