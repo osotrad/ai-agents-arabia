@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+# Neon CLI context + credentials written by `neon deploy` / `neon env pull`.
+# `neon link` writes a .neon FILE (not a directory), so match both forms.
+.neon
+.neon/
+neon.ts.local
 
 # vercel
 .vercel
