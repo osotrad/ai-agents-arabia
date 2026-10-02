@@ -595,6 +595,42 @@ export async function getSiteContext() {
   };
 }
 
+/** Tables the application expects to exist; a missing one breaks writes. */
+const REQUIRED_TABLES = [
+  "articles",
+  "sources",
+  "article_sources",
+  "revisions",
+  "glossary_terms",
+  "corrections",
+  "audit_log",
+] as const;
+
+/**
+ * Read-only schema report. A write failing with `42P01 relation ... does not
+ * exist` is otherwise undiagnosable from the caller side, and an unapplied
+ * migration ledger is invisible until something tries to insert.
+ */
+async function getSchemaReport() {
+  try {
+    const tablesRes = await db.execute(
+      sql`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`,
+    );
+    const rows =
+      (tablesRes as unknown as { rows?: { tablename: string }[] }).rows ??
+      (tablesRes as unknown as { tablename: string }[]);
+    const present = new Set((rows ?? []).map((r) => r.tablename));
+    const missing = REQUIRED_TABLES.filter((t) => !present.has(t));
+    return { missing, ok: missing.length === 0 };
+  } catch (err) {
+    return {
+      missing: [...REQUIRED_TABLES],
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 /** Operational health for dashboards / the agent's own status checks. */
 export async function getHealth() {
   const [published, pendingReview, needsRecheck] = await Promise.all([
@@ -618,6 +654,7 @@ export async function getHealth() {
 
   return {
     articles: { published, pendingReview, needsRecheck },
+    schema: await getSchemaReport(),
     config: { issues: envIssues() },
     recentAudit,
   };
