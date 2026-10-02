@@ -10,10 +10,11 @@ to "one published article".
 - [4. Diagnostics ladder](#4-diagnostics-ladder)
 - [5. Publishing](#5-publishing)
 - [6. The `*.workers.dev` reachability problem](#6-the-workersdev-reachability-problem)
-- [7. Claim validation semantics](#7-claim-validation-semantics)
-- [8. Human review](#8-human-review)
-- [9. CI workflows](#9-ci-workflows)
-- [10. Editorial decisions that are not obvious](#10-editorial-decisions-that-are-not-obvious)
+- [7. Article images](#7-article-images)
+- [8. Claim validation semantics](#8-claim-validation-semantics)
+- [9. Human review](#9-human-review)
+- [10. CI workflows](#10-ci-workflows)
+- [11. Editorial decisions that are not obvious](#11-editorial-decisions-that-are-not-obvious)
 
 ---
 
@@ -244,7 +245,52 @@ curl -s -o /dev/null -w '%{http_code}\n' https://blog.cloudflare.com/   # 200
 curl -s -o /dev/null -w '%{http_code}\n' "$SITE/"                       # 000 => filtered
 ```
 
-## 7. Claim validation semantics
+## 7. Article images
+
+Header images are stored in **Neon Object Storage** (beta) and served from a
+`public_read` bucket. Six settings are required; with any of them unset,
+`POST /api/v1/images` returns `503` and the rest of the site is unaffected.
+
+| Variable | Source |
+| --- | --- |
+| `NEON_STORAGE_ENDPOINT` | branch S3 endpoint from `neon deploy` |
+| `NEON_STORAGE_REGION` | same |
+| `NEON_STORAGE_ACCESS_KEY_ID` | same |
+| `NEON_STORAGE_SECRET_ACCESS_KEY` | same |
+| `IMAGE_BUCKET` | your bucket name |
+| `IMAGE_PUBLIC_BASE` | optional; only if the bucket has its own public origin |
+
+```
+bucket must be public_read:  visible in images as <img>, usable as og:image
+bucket private:              403 in the browser; upload still succeeds
+```
+
+Pass them to the Worker as secrets — they are credentials:
+
+```bash
+printf '%s' "$NEON_STORAGE_ACCESS_KEY_ID" | gh secret set NEON_STORAGE_ACCESS_KEY_ID
+printf '%s' "$NEON_STORAGE_SECRET_ACCESS_KEY" | gh secret set NEON_STORAGE_SECRET_ACCESS_KEY
+gh variable set NEON_STORAGE_ENDPOINT --body "$ENDPOINT"
+gh variable set NEON_STORAGE_REGION  --body "$REGION"
+gh variable set IMAGE_BUCKET         --body "article-images"
+gh workflow run deploy.yml
+```
+
+Then extend the deploy's `put()` list so the credentials reach the Worker.
+
+**The signer is hand-rolled** (`src/lib/storage.ts`) rather than pulling in the
+AWS SDK, because a Worker cold-starts and the request shape is fixed. It was
+cross-validated byte-for-byte against `aws4fetch` for GET on a bucket root,
+GET with a `Range` header, and a path-style PUT — identical signatures in all
+three. Two notes:
+
+- Neon needs **path-style** addressing, so keys are appended to the endpoint
+  path rather than the host, and `forcePathStyle` behaviour is built in.
+- Our signer percent-encodes `+` (correct per SigV4: only `A-Z a-z 0-9 - . _ ~`
+  are unreserved); `aws4fetch` leaves it literal. Object keys are therefore
+  constrained to a safe ASCII set so the difference can never matter.
+
+## 8. Claim validation semantics
 
 `POST /api/v1/articles/validate` (MCP `validate_article`) returns
 `{ok, errors, warnings}`. **Errors block the write; warnings do not.**
@@ -289,7 +335,7 @@ excerpt):
 "انخفضت التكلفة بنسبة 70% بحسب التقرير"             → all-figures-missing
 ```
 
-## 8. Human review
+## 9. Human review
 
 The queue at `/admin/review` is auth-gated and `noindex`. It does not take the
 key from the URL — a `?key=` value lands in browser history, referrer headers
@@ -313,7 +359,7 @@ Approving **publishes**, so it is subject to `DAILY_PUBLISH_CAP` exactly like
 every other publish path — it returns `429` at the cap and the article stays in
 `pending_review`. Rejecting archives and is not capped.
 
-## 9. CI workflows
+## 10. CI workflows
 
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
@@ -336,7 +382,7 @@ gh workflow run admin-session-check.yml
 None of them print a secret. `admin-session-check.yml` asserts the cookie is
 `HttpOnly` and never writes the key to a file in the workspace.
 
-## 10. Editorial decisions that are not obvious
+## 11. Editorial decisions that are not obvious
 
 **The public website does not say it is written by an AI agent, or reviewed by
 a human.** The site presents as a straightforward Arabic publication about AI

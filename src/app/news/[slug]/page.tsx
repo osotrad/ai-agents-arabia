@@ -122,6 +122,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
       type: "article",
       publishedTime: a.publishedAt?.toISOString(),
       modifiedTime: a.updatedAt?.toISOString(),
+      ...(a.imageUrl ? { images: [{ url: a.imageUrl, alt: a.imageAlt ?? "" }] } : {}),
+    },
+    twitter: {
+      card: a.imageUrl ? "summary_large_image" : "summary",
+      ...(a.imageUrl ? { images: [a.imageUrl] } : {}),
     },
   };
 }
@@ -186,6 +191,24 @@ export default async function ArticlePage({ params }: Params) {
               ]}
             />
           </header>
+
+          {/*
+            Header image. Rendered here by the page component rather than living
+            in `bodyMd`, so the markdown sanitizer is never involved. `alt` falls
+            back to the title, which is always a safe description.
+          */}
+          {a.imageUrl && (
+            <figure className="mt-8 -mx-5 sm:-mx-6">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={a.imageUrl}
+                alt={a.imageAlt ?? a.titleAr}
+                loading="eager"
+                decoding="async"
+                className="w-full max-h-[26rem] object-cover border-y border-ink-line"
+              />
+            </figure>
+          )}
 
           <div
             className="prose-ar text-[1.05rem] leading-loose"

@@ -70,6 +70,23 @@ row carries a `similarity` score.
 **Run this before drafting**, not after: it is the only check that catches a
 near-duplicate phrased differently from what `GET /context`'s recent titles show.
 
+### `POST /api/v1/images`
+Store an article header image. Body: `{ slug?, dataBase64, contentType?, alt? }`.
+
+Returns `201 { ok, image: { key, url, contentType, bytes }, hint }`. Pass
+`image.url` as `imageUrl` (and the alt text as `imageAlt`) when creating or
+patching the article.
+
+- PNG, JPEG or WebP only. `contentType` is a hint — the **bytes** decide, and a
+  payload whose magic bytes disagree with the declared type is rejected `422`.
+- `413` when over `MAX_IMAGE_BYTES` (default 5 MiB); `503` when
+  `NEON_STORAGE_*` / `IMAGE_BUCKET` are unset.
+- Base64 is validated strictly, so malformed input fails before any upload.
+- The object key is generated server-side as
+  `articles/<slug>-<8 hex>.<ext>`; nothing user-supplied reaches the path.
+- Private buckets are not supported for serving — the bucket must be
+  `public_read` (or have `IMAGE_PUBLIC_BASE` pointed at a public origin).
+
 ### `POST /api/v1/glossary`
 Upsert a term: `{ termAr, termEn, definitionAr, slug?, sourceUrl?, embedding? }`.
 Responds `{ ok, term: { id, slug, termAr, termEn } }`.
@@ -133,6 +150,7 @@ Connect any MCP client to `${SITE_URL}/api/mcp`:
 | `list_articles` | `GET /articles` |
 | `search_articles` | `GET /search` |
 | `find_similar_articles` | `POST /articles/similar` |
+| `upload_image` | `POST /images` |
 | `upsert_glossary` | `POST /glossary` |
 | `submit_correction` | `POST /corrections` |
 | `health` | `GET /health` |
@@ -179,6 +197,10 @@ plain Streamable-HTTP MCP server.)
 
 - Markdown → sanitized HTML (raw HTML stripped; links forced `rel="nofollow"`).
 - Unique slugs (auto-suffixed on collision).
+- Header images live in `articles.image_url` / `image_alt` and are rendered by
+  the page component. They never pass through `renderMarkdown`, so the
+  sanitizer's allowlist still excludes `img` — a markdown `![alt](url)` in
+  `bodyMd` renders to nothing at all.
 - `sources` upserted by normalized URL; each `claim` linked to its source row.
 - Revalidation (`/news/{slug}`, `/news`, `/`, tag `articles`) on publish, plus an
   optional IndexNow ping.

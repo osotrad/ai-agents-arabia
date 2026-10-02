@@ -17,6 +17,18 @@ const envSchema = z.object({
   /** Bearer token the external agent uses against /api/v1 and /api/mcp. */
   AGENT_API_KEY: z.string().min(16).optional(),
   INDEXNOW_KEY: z.string().min(8).optional(),
+  // --- Neon Object Storage (S3-compatible) ---
+  /** Branch endpoint, e.g. https://<id>.storage.<region>.neon.build/<bucket-path> */
+  NEON_STORAGE_ENDPOINT: z.string().url().optional(),
+  NEON_STORAGE_REGION: z.string().min(1).optional(),
+  NEON_STORAGE_ACCESS_KEY_ID: z.string().min(8).optional(),
+  NEON_STORAGE_SECRET_ACCESS_KEY: z.string().min(8).optional(),
+  /** Bucket that holds generated images. Must be public_read to serve <img>. */
+  IMAGE_BUCKET: z.string().min(3).max(63).optional(),
+  /** Public origin serving IMAGE_BUCKET, if it has one; else the S3 endpoint is used. */
+  IMAGE_PUBLIC_BASE: z.string().url().optional(),
+  /** Max bytes accepted per image upload (default 5 MB). */
+  MAX_IMAGE_BYTES: z.coerce.number().int().positive().default(5_242_880),
   SITE_URL: z.string().url().default("http://localhost:3000"),
   SITE_NAME: z.string().default("وكلاء"),
   /** Max articles the agent may auto-publish per rolling 24h. */
@@ -92,6 +104,34 @@ export function siteName(): string {
 
 export function publishCap(): number {
   return env().DAILY_PUBLISH_CAP;
+}
+
+export function storageEndpoint(): string | undefined {
+  return env().NEON_STORAGE_ENDPOINT;
+}
+
+export function storageRegion(): string | undefined {
+  return env().NEON_STORAGE_REGION;
+}
+
+export function storageAccessKeyId(): string | undefined {
+  return env().NEON_STORAGE_ACCESS_KEY_ID;
+}
+
+export function storageSecretAccessKey(): string | undefined {
+  return env().NEON_STORAGE_SECRET_ACCESS_KEY;
+}
+
+export function imageBucket(): string | undefined {
+  return env().IMAGE_BUCKET;
+}
+
+export function storagePublicBase(): string | undefined {
+  return env().IMAGE_PUBLIC_BASE;
+}
+
+export function maxImageBytes(): number {
+  return env().MAX_IMAGE_BYTES;
 }
 
 export function isProduction(): boolean {

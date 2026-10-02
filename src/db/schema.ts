@@ -80,6 +80,14 @@ export const articles = pgTable(
     slug: varchar("slug", { length: 255 }).notNull(),
     titleAr: text("title_ar").notNull(),
     excerptAr: text("excerpt_ar"),
+    /**
+     * Optional header image for the article, held in Neon Object Storage.
+     * Rendered by the page component — never injected into `bodyMd`, so the
+     * markdown sanitizer never sees it.
+     */
+    imageUrl: text("image_url"),
+    /** Arabic alt text. Required in practice: the site is RTL prose. */
+    imageAlt: text("image_alt"),
     bodyMd: text("body_md").notNull(),
     bodyHtml: text("body_html"),
     type: articleTypeEnum("type").notNull(),

@@ -36,6 +36,31 @@ pnpm db:studio             # inspect data
 
 Migrations require `pgvector`; it is created by the migrations themselves.
 
+## Article images
+
+Articles may carry one header image. The agent uploads bytes to
+`POST /api/v1/images` (MCP `upload_image`), gets back a URL, and passes it as
+`imageUrl` when creating the article. Images live in **Neon Object Storage**
+(beta) and are served from a `public_read` bucket.
+
+Scope is deliberately narrow:
+
+- Header only. The image is rendered by the page component from
+  `articles.image_url`; **it never enters `bodyMd`**, so the markdown
+  sanitizer's tag allowlist is untouched and still has no `img`.
+- PNG, JPEG and WebP only, and the *bytes* decide — a mislabelled payload is
+  rejected against its magic bytes, and a mismatch with a declared
+  `contentType` is an error.
+- Keys are generated server-side into a conservative ASCII set
+  (`articles/<slug>-<8 hex>.<ext>`), so nothing user-supplied reaches the
+  object path.
+
+`imageAlt` is the Arabic alt text and is required in practice. With an image
+present the page also emits `og:image` and a large Twitter card.
+
+Storage credentials (`NEON_STORAGE_*`, `IMAGE_BUCKET`) are optional: unset them
+and uploads return `503` while the rest of the site works unchanged.
+
 ## The agent interface
 
 Everything an external agent needs is under `/api/v1` and `/api/mcp`. Both are
@@ -56,10 +81,11 @@ and **[docs/OPERATIONS.md](./docs/OPERATIONS.md)** (deploy & publish runbook).
 | GET | `/api/v1/articles` | List |
 | GET | `/api/v1/search?q=` | Keyword search over published articles |
 | POST | `/api/v1/articles/similar` | pgvector cosine search (semantic dedupe) |
+| POST | `/api/v1/images` | Store an article header image (Neon Object Storage) |
 | POST | `/api/v1/glossary` | Upsert a glossary term |
 | POST | `/api/v1/corrections` | Log a correction |
 | GET | `/api/v1/health` | Counts, config issues, recent audit events |
-| POST/GET | `/api/mcp` | MCP Streamable HTTP (12 tools) |
+| POST/GET | `/api/mcp` | MCP Streamable HTTP (13 tools) |
 
 The REST routes and the MCP tools share one set of Zod schemas, so validation
 cannot drift between the two interfaces.
@@ -70,6 +96,7 @@ Also public: `/llms.txt`, `/feed.xml`, `/sitemap.xml`, `/robots.txt`.
 
 - `/` — homepage: live counts, latest material, editorial guarantees
 - `/news`, `/news/{slug}` — articles, filterable by type, each with its sources
+  and an optional header image
 - `/glossary`, `/glossary/{slug}` — filterable Arabic–English glossary
 - `/search?q=` — site search
 - `/sources` — every cited domain and how many articles rely on it

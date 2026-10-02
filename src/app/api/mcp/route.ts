@@ -4,6 +4,7 @@ import {
 } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { mcpAuthInfo } from "@/lib/auth";
+import { uploadArticleImage } from "@/lib/images";
 import { siteUrl } from "@/lib/env";
 import {
   createArticle,
@@ -274,6 +275,35 @@ function registerTools(server: McpServer) {
       try {
         const c = await submitCorrection(args, actor);
         return text({ ok: true, correctionId: c.id });
+      } catch (e) {
+        return toolError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "upload_image",
+    {
+      description:
+        "Store an image to use as an article header. Send base64 image bytes; returns a public URL to pass as imageUrl. PNG/JPEG/WebP only, and the bytes must match the declared type.",
+      inputSchema: z.object({
+        slug: z
+          .string()
+          .regex(/^[a-z0-9-]{1,120}$/)
+          .default("article"),
+        dataBase64: z.string().min(16),
+        contentType: z.enum(["image/png", "image/jpeg", "image/webp"]).optional(),
+        alt: z.string().min(5).max(300).optional(),
+      }),
+    },
+    async (args) => {
+      try {
+        const image = await uploadArticleImage(args);
+        return text({
+          ok: true,
+          image,
+          hint: "pass image.url as imageUrl (and alt as imageAlt) on the article",
+        });
       } catch (e) {
         return toolError(e);
       }

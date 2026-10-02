@@ -20,9 +20,11 @@ The وكلاء site is headless: you create and publish content through its API.
 3. Check for near-duplicates before creating:
    `POST {base}/articles/similar` with the draft's 1536-dim embedding
    (`threshold: 0.9`), or `GET {base}/search?q=`.
-4. Validate: `POST {base}/articles/validate`.
-5. Create: `POST {base}/articles`.
-6. Publish: `POST {base}/articles/{id}/publish`.
+4. Optional header image: `POST {base}/images` with `dataBase64` (PNG/JPEG/WebP)
+   → pass the returned `url` as `imageUrl`, with Arabic `imageAlt`.
+5. Validate: `POST {base}/articles/validate`.
+6. Create: `POST {base}/articles`.
+7. Publish: `POST {base}/articles/{id}/publish`.
 
 ## Rules that will fail your request
 

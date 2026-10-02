@@ -29,6 +29,23 @@ export const claimInputSchema = z.object({
 
 export const embeddingSchema = z.array(z.number()).length(1536);
 
+/** Image URLs are agent-supplied, so restrict the scheme at the schema edge. */
+const httpUrl = z
+  .string()
+  .url()
+  .max(2000)
+  .refine((v) => /^https?:\/\//i.test(v), "imageUrl must be an http(s) URL");
+
+/**
+ * Optional header image, stored in Neon Object Storage and rendered by the page
+ * component. It never enters `bodyMd`, so the markdown sanitizer is unaffected.
+ */
+export const articleImageSchema = {
+  imageUrl: httpUrl.optional(),
+  /** Arabic alt text. Required in practice — the site is RTL prose. */
+  imageAlt: z.string().min(5).max(300).optional(),
+};
+
 export const articleInputSchema = z.object({
   titleAr: z.string().min(5).max(300),
   excerptAr: z.string().max(600).optional(),
@@ -46,6 +63,7 @@ export const articleInputSchema = z.object({
   embedding: embeddingSchema.optional(),
   /** ISO date; defaults per-type when published. */
   recheckAfter: z.string().datetime().optional(),
+  ...articleImageSchema,
 });
 
 export type ArticleInput = z.infer<typeof articleInputSchema>;
@@ -57,6 +75,7 @@ export const articlePatchSchema = z
     bodyMd: z.string().min(80).max(60_000).optional(),
     confidenceScore: z.number().min(0).max(1).optional(),
     reason: z.string().max(500).optional(),
+    ...articleImageSchema,
   })
   .refine(
     (v) => Object.keys(v).some((k) => k !== "reason"),

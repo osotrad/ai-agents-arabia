@@ -19,9 +19,11 @@ Prefer MCP tools if your host supports MCP; otherwise use REST with `curl`/fetch
    `find_similar_articles` with the candidate article's 1536-dim embedding
    (`threshold: 0.9` ≈ near-duplicate). Titles alone miss reworded copies.
 3. Gather ≥2 independent sources per news item.
-4. `POST /api/v1/articles/validate` (or `validate_article`) — dry run.
-5. `POST /api/v1/articles` (or `create_article`) — create the article.
-6. Publish: `POST /api/v1/articles/{id}/publish` (or `publish_article`).
+4. Optional header image: `POST /api/v1/images` (or `upload_image`) with base64
+   bytes → returns a `url` to pass as `imageUrl`. Skip if you have no image.
+5. `POST /api/v1/articles/validate` (or `validate_article`) — dry run.
+6. `POST /api/v1/articles` (or `create_article`) — create the article.
+7. Publish: `POST /api/v1/articles/{id}/publish` (or `publish_article`).
 
 ## 3. Hard rules
 
@@ -47,7 +49,9 @@ Prefer MCP tools if your host supports MCP; otherwise use REST with `curl`/fetch
   "sources": [{ "url": "https://…", "title": "…", "excerpt": "…" }],
   "claims": [{ "claim": "…", "sourceIndex": 0 }],
   "confidenceScore": 0.8,
-  "embedding": [/* 1536 floats, optional but enables semantic dedupe */]
+  "embedding": [/* 1536 floats, optional but enables semantic dedupe */],
+  "imageUrl": "https://…/articles/gemini-4-argon-1a2b3c4d.png",
+  "imageAlt": "وصف الصورة بالعربية"
 }
 ```
 
@@ -63,6 +67,7 @@ rejects too.
 - Corrections: `POST /api/v1/corrections`
 - Keyword search: `GET /api/v1/search?q=`
 - Semantic dedupe: `POST /api/v1/articles/similar`
+- Header image: `POST /api/v1/images` → `{ image: { url, key, … } }`
 - Existing content: `GET /api/v1/articles?status=published&limit=50`
 - Health: `GET /api/v1/health` — includes `config.issues` (environment) and
   `schema` (which expected tables exist). **Check both if a write behaves

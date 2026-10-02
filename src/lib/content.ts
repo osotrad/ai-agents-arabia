@@ -345,6 +345,8 @@ export async function createArticle(input: ArticleInput, actor: AuditActor) {
       slug,
       titleAr: input.titleAr,
       excerptAr: input.excerptAr ?? null,
+      imageUrl: input.imageUrl ?? null,
+      imageAlt: input.imageAlt ?? null,
       bodyMd: input.bodyMd,
       bodyHtml,
       type: input.type,
@@ -412,6 +414,8 @@ export async function updateArticle(
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (patch.titleAr !== undefined) updates.titleAr = patch.titleAr;
   if (patch.excerptAr !== undefined) updates.excerptAr = patch.excerptAr;
+  if (patch.imageUrl !== undefined) updates.imageUrl = patch.imageUrl;
+  if (patch.imageAlt !== undefined) updates.imageAlt = patch.imageAlt;
   if (patch.confidenceScore !== undefined)
     updates.confidenceScore = patch.confidenceScore;
 

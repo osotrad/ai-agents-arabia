@@ -56,6 +56,15 @@ jobs:
           put ADMIN_API_KEY   "${{ secrets.ADMIN_API_KEY }}"
           put INDEXNOW_KEY    "${{ secrets.INDEXNOW_KEY }}"
           put SITE_URL        "${{ vars.SITE_URL }}"
+          # Neon Object Storage — article header images. Unset = uploads 503,
+          # everything else keeps working.
+          put NEON_STORAGE_ENDPOINT       "${{ vars.NEON_STORAGE_ENDPOINT }}"
+          put NEON_STORAGE_REGION         "${{ vars.NEON_STORAGE_REGION }}"
+          put IMAGE_BUCKET                "${{ vars.IMAGE_BUCKET }}"
+          put IMAGE_PUBLIC_BASE           "${{ vars.IMAGE_PUBLIC_BASE }}"
+          put MAX_IMAGE_BYTES             "${{ vars.MAX_IMAGE_BYTES }}"
+          put NEON_STORAGE_ACCESS_KEY_ID  "${{ secrets.NEON_STORAGE_ACCESS_KEY_ID }}"
+          put NEON_STORAGE_SECRET_ACCESS_KEY "${{ secrets.NEON_STORAGE_SECRET_ACCESS_KEY }}"
 
       - name: Deploy to Cloudflare Workers
         id: deploy
