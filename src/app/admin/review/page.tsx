@@ -1,6 +1,7 @@
 import { db, articles } from "@/db";
 import { desc, eq } from "drizzle-orm";
 import type { Metadata } from "next";
+import { ReviewActions } from "@/components/review-actions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -63,25 +64,3 @@ export default async function AdminReviewPage({
   );
 }
 
-function ReviewActions({ articleId, adminKey }: { articleId: string; adminKey: string }) {
-  return (
-    <form className="flex gap-3 mt-4 pt-4 border-t border-ink-line" method="post" action="/api/admin/review-form">
-      <input type="hidden" name="articleId" value={articleId} />
-      <input type="hidden" name="key" value={adminKey} />
-      <button
-        name="action"
-        value="approve"
-        className="px-4 py-2 bg-signal text-ink font-semibold rounded hover:opacity-90"
-      >
-        اعتمد وانشر
-      </button>
-      <button
-        name="action"
-        value="reject"
-        className="px-4 py-2 border border-ink-line text-paper-dim rounded hover:text-warn hover:border-warn"
-      >
-        ارفض
-      </button>
-    </form>
-  );
-}

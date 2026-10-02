@@ -1,30 +1,28 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { authenticateAgent } from "@/lib/auth";
+import { pingIndexNow } from "@/lib/indexnow";
 
 /**
- * GET /api/indexnow?url=/news/slug  (header: x-admin-key)
- * Pings IndexNow (Bing/Yandex) after publish. Key file route below.
+ * POST /api/indexnow  (Authorization: Bearer <AGENT_API_KEY> or x-admin-key)
+ * Body: { url?: string, urls?: string[] }
+ * Pings IndexNow (Bing/Yandex) with one or more site-relative paths.
  */
-export async function POST(req: NextRequest) {
-  const key = req.headers.get("x-admin-key");
-  if (!process.env.ADMIN_API_KEY || key !== process.env.ADMIN_API_KEY) {
+export async function POST(req: Request) {
+  if (!authenticateAgent(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const { url } = (await req.json()) as { url?: string };
-  if (!url) return NextResponse.json({ error: "url required" }, { status: 400 });
-
-  const indexnowKey = process.env.INDEXNOW_KEY;
-  if (!indexnowKey) return NextResponse.json({ skipped: true, reason: "no INDEXNOW_KEY" });
-
-  const host = new URL(process.env.SITE_URL ?? "http://localhost").host;
-  const res = await fetch("https://api.indexnow.org/indexnow", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      host,
-      key: indexnowKey,
-      keyLocation: `${process.env.SITE_URL}/${indexnowKey}.txt`,
-      urlList: [`${process.env.SITE_URL}${url}`],
-    }),
-  });
-  return NextResponse.json({ status: res.status });
+  const body = (await req.json().catch(() => ({}))) as {
+    url?: string;
+    urls?: string[];
+  };
+  const paths = body.urls ?? (body.url ? [body.url] : []);
+  if (paths.length === 0) {
+    return NextResponse.json({ error: "url or urls required" }, { status: 400 });
+  }
+  const status = await pingIndexNow(paths);
+  if (status === null) {
+    return NextResponse.json({ skipped: true, reason: "INDEXNOW_KEY not configured" });
+  }
+  return NextResponse.json({ status });
 }
+

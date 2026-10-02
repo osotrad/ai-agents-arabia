@@ -49,19 +49,6 @@ export const articleStatusEnum = pgEnum("article_status", [
   "archived",
 ]);
 
-export const taskStatusEnum = pgEnum("task_status", [
-  "pending",
-  "locked",
-  "done",
-  "failed",
-]);
-
-export const runStatusEnum = pgEnum("run_status", [
-  "running",
-  "success",
-  "failed",
-]);
-
 // ---------- Tables ----------
 
 /** External sources the agent reads (feeds, official blogs, papers). */
@@ -135,25 +122,31 @@ export const articleSources = pgTable(
   (t) => [primaryKey({ columns: [t.articleId, t.sourceId, t.claim] })],
 );
 
-/** Audit trail for every agent pipeline step. */
-export const agentRuns = pgTable(
-  "agent_runs",
+/**
+ * Append-only audit trail for every content mutation, from any actor
+ * (external agent via the Content API / MCP, or a human reviewer).
+ */
+export const auditLog = pgTable(
+  "audit_log",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    pipelineStep: varchar("pipeline_step", { length: 64 }).notNull(),
-    inputRefs: jsonb("input_refs"),
-    outputRefs: jsonb("output_refs"),
-    model: varchar("model", { length: 128 }),
-    /** Structured numeric scoring used by gates (0..1). */
-    confidence: real("confidence"),
-    status: runStatusEnum("status").default("running").notNull(),
-    error: text("error"),
-    startedAt: timestamp("started_at", { withTimezone: true })
+    /** Who performed the action: "agent" | "human" | "system". */
+    actor: varchar("actor", { length: 32 }).notNull().default("agent"),
+    /** Verb, e.g. "article.create", "article.publish", "glossary.upsert". */
+    action: varchar("action", { length: 64 }).notNull(),
+    /** Kind of target, e.g. "article" | "glossary_term" | "correction". */
+    targetType: varchar("target_type", { length: 32 }),
+    targetId: uuid("target_id"),
+    /** Free-form structured context (request summary, diff, reasons). */
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
-  (t) => [index("agent_runs_step_idx").on(t.pipelineStep, t.startedAt)],
+  (t) => [
+    index("audit_log_action_idx").on(t.action, t.createdAt),
+    index("audit_log_target_idx").on(t.targetType, t.targetId),
+  ],
 );
 
 /** Every change to an article is snapshotted — full history. */
@@ -173,24 +166,6 @@ export const revisions = pgTable(
       .notNull(),
   },
   (t) => [index("revisions_article_idx").on(t.articleId, t.version)],
-);
-
-/** Lightweight Postgres job queue (SELECT … FOR UPDATE SKIP LOCKED). */
-export const tasks = pgTable(
-  "tasks",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    kind: varchar("kind", { length: 64 }).notNull(),
-    payload: jsonb("payload"),
-    status: taskStatusEnum("status").default("pending").notNull(),
-    attempts: integer("attempts").default(0).notNull(),
-    runAt: timestamp("run_at", { withTimezone: true }).defaultNow().notNull(),
-    lockedAt: timestamp("locked_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (t) => [index("tasks_pick_idx").on(t.status, t.runAt)],
 );
 
 export const glossaryTerms = pgTable(

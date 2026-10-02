@@ -1,14 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
-import { revalidateTag, revalidatePath } from "next/cache";
+import { NextResponse } from "next/server";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { authenticateAgent } from "@/lib/auth";
 
 /**
- * POST /api/revalidate  (header: x-admin-key)
+ * POST /api/revalidate  (Authorization: Bearer <AGENT_API_KEY> or x-admin-key)
  * Body: { tag?: string; path?: string }
- * Called by the external agent worker after publishing.
+ * Optional external hook — the Content API already revalidates on write.
  */
-export async function POST(req: NextRequest) {
-  const key = req.headers.get("x-admin-key");
-  if (!process.env.ADMIN_API_KEY || key !== process.env.ADMIN_API_KEY) {
+export async function POST(req: Request) {
+  if (!authenticateAgent(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const body = (await req.json().catch(() => ({}))) as {
@@ -22,3 +22,4 @@ export async function POST(req: NextRequest) {
   if (body.path) revalidatePath(body.path);
   return NextResponse.json({ revalidated: true });
 }
+

@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# وكلاء — ai-agents-arabia
 
-## Getting Started
+An Arabic-language AI-agents news site that is **website-only**: it exposes a
+clean content API (REST + MCP) so an already-configured external agent
+(Hermes, OpenClaw, or any HTTP/MCP-capable agent) can discover, write, and
+publish content. No agent runtime lives in this repo.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router, RTL Arabic) on **Cloudflare Workers** via OpenNext
+- **Neon Postgres** + **Drizzle ORM** + **pgvector** for semantic dedupe
+- **Tailwind v4** design system
+- **MCP** via `@modelcontextprotocol/server` (Streamable HTTP at `/api/mcp`)
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env       # fill in DATABASE_URL, AGENT_API_KEY, ...
+pnpm db:migrate            # apply Drizzle migrations
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Database
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm db:generate           # generate a migration from src/db/schema.ts
+pnpm db:migrate            # apply migrations
+pnpm db:studio             # inspect data
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Migrations require `pgvector`; it is created by the migrations themselves.
 
-## Learn More
+## The agent interface
 
-To learn more about Next.js, take a look at the following resources:
+Everything an external agent needs is under `/api/v1` and `/api/mcp`. Both are
+authenticated with `Authorization: Bearer <AGENT_API_KEY>`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+See **[AGENTS.md](./AGENTS.md)** (operating manual) and
+**[docs/AGENT-INTEGRATION.md](./docs/AGENT-INTEGRATION.md)** (full reference).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/v1/context` | Bootstrap: guidelines, counts, recent titles |
+| GET | `/api/v1/guidelines` | Editorial policy (markdown) |
+| POST | `/api/v1/articles/validate` | Dry-run checks (no write) |
+| POST | `/api/v1/articles` | Create (`draft` \| `pending_review` \| `published`) |
+| PATCH | `/api/v1/articles/{id}` | Edit (body edits create a revision) |
+| POST | `/api/v1/articles/{id}/publish` | Publish by id or slug |
+| GET | `/api/v1/articles` | List |
+| POST | `/api/v1/glossary` | Upsert a glossary term |
+| POST | `/api/v1/corrections` | Log a correction |
+| GET | `/api/v1/health` | Counts + recent audit events |
+| POST/GET | `/api/mcp` | MCP Streamable HTTP (tools) |
 
-## Deploy on Vercel
+Also public: `/llms.txt`, `/feed.xml`, `/sitemap.xml`, `/robots.txt`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Editorial transparency
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `/how-it-works` — how publishing works
+- `/corrections` — public corrections log
+- `/editor` — the accountable human editor
+- `/admin/review` — human review queue (`?key=<ADMIN_API_KEY>`)
+
+## Human review
+
+Drafts created with `status: "pending_review"` appear at `/admin/review`.
+Approve (optionally with edits) or reject via the header-authenticated
+`POST /api/admin/review`.
+
+## Deploy
+
+CI runs lint + typecheck + build (`.github/workflows/ci.yml`). Deployment to
+Cloudflare Workers happens in `.github/workflows/deploy.yml`, which sets all
+required Worker secrets. Configure GitHub secrets: `CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID`, `DATABASE_URL`, `AGENT_API_KEY`, `ADMIN_API_KEY`,
+`INDEXNOW_KEY`; and the `SITE_URL` repository variable.

@@ -1,3 +1,5 @@
+--> Enable pgvector before any vector(1536) column is declared.
+CREATE EXTENSION IF NOT EXISTS "vector";--> statement-breakpoint
 CREATE TYPE "public"."article_status" AS ENUM('draft', 'pending_review', 'published', 'needs_recheck', 'archived');--> statement-breakpoint
 CREATE TYPE "public"."article_type" AS ENUM('news', 'glossary', 'summary', 'explainer', 'review');--> statement-breakpoint
 CREATE TYPE "public"."run_status" AS ENUM('running', 'success', 'failed');--> statement-breakpoint
