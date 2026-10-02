@@ -1,0 +1,66 @@
+name: Admin session check
+
+# Verifies the human review surface end to end without exposing ADMIN_API_KEY:
+# exchanges it for a session cookie, reads the queue, then ends the session.
+# Read-only apart from the cookie exchange.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE: ${{ vars.SITE_URL }}
+      ADMIN_KEY: ${{ secrets.ADMIN_API_KEY }}
+
+    steps:
+      - name: Check the review flow
+        run: |
+          set -euo pipefail
+          [ -n "${ADMIN_KEY:-}" ] || { echo "::error::ADMIN_API_KEY is not set"; exit 1; }
+
+          echo "1. unauthenticated queue read (must be 401)"
+          code=$(curl -sS -m 30 -o /dev/null -w '%{http_code}' "$BASE/api/admin/review")
+          echo "   GET /api/admin/review -> $code"
+          [ "$code" = "401" ] || { echo "::error::expected 401"; exit 1; }
+
+          echo "2. key -> session cookie"
+          code=$(curl -sS -m 30 -o /dev/null -D headers.txt -w '%{http_code}' \
+            -X POST "$BASE/api/admin/session" \
+            -H "content-type: application/json" \
+            -d "{\"key\":\"$ADMIN_KEY\"}")
+          echo "   POST /api/admin/session -> $code"
+          [ "$code" = "200" ] || { echo "::error::session exchange failed"; exit 1; }
+          grep -qi 'set-cookie:.*HttpOnly' headers.txt \
+            || { echo "::error::cookie is not HttpOnly"; exit 1; }
+          echo "   cookie is HttpOnly ✓"
+
+          jar="cookies.txt"
+          grep -i '^set-cookie:' headers.txt | sed 's/^[Ss]et-[Cc]ookie: //' | cut -d';' -f1 > "$jar"
+
+          echo "3. queue read with the cookie"
+          code=$(curl -sS -m 30 -b "$jar" -o queue.json -w '%{http_code}' \
+            "$BASE/api/admin/review?status=pending_review&limit=5")
+          echo "   GET /api/admin/review?status=pending_review -> $code"
+          [ "$code" = "200" ] || { echo "::error::queue read failed"; exit 1; }
+          python3 -c "
+          import json
+          d = json.load(open('queue.json'))
+          print('   status:', d['status'], '| queued:', len(d['queue']))
+          for a in d['queue']:
+              print('    -', a['slug'], a['status'])
+          "
+
+          echo "4. review page renders with the cookie"
+          code=$(curl -sS -m 30 -b "$jar" -o page.html -w '%{http_code}' "$BASE/admin/review")
+          echo "   GET /admin/review -> $code"
+          [ "$code" = "200" ] || { echo "::error::review page failed"; exit 1; }
+          grep -q 'قائمة المراجعة' page.html \
+            || { echo "::error::review page did not render the queue"; exit 1; }
+          echo "   queue rendered ✓"
+
+          echo "5. end the session"
+          code=$(curl -sS -m 30 -o /dev/null -w '%{http_code}' -X DELETE "$BASE/api/admin/session")
+          echo "   DELETE /api/admin/session -> $code"
