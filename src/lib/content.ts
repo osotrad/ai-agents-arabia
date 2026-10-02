@@ -42,6 +42,8 @@ const RECHECK_DAYS: Record<string, number> = {
 };
 const DEFAULT_RECHECK_DAYS = 75;
 const MIN_SOURCES_NEWS = 2;
+/** Share of a claim's comparable words that must appear in its excerpt. */
+const MIN_LEXICAL_OVERLAP = 0.2;
 
 function recheckDate(type: string, override?: string): Date {
   if (override) return new Date(override);
@@ -107,19 +109,147 @@ export function validateArticleInput(input: ArticleInput): {
     }
   }
 
-  // Each claim should share meaningful vocabulary with its cited excerpt.
+  // Each claim should be supportable by the excerpt it cites.
   for (const c of input.claims) {
-    const excerpt = excerpts[c.sourceIndex] ?? "";
-    if (!excerpt) continue;
-    const words = c.claim.split(/\s+/).filter((w) => w.length > 4);
-    if (words.length === 0) continue;
-    const overlap = words.filter((w) => excerpt.includes(w)).length;
-    if (overlap / words.length < 0.2) {
-      warnings.push(`claim weakly supported by its source: "${c.claim.slice(0, 60)}"`);
+    const support = assessClaimSupport(c.claim, excerpts[c.sourceIndex] ?? "");
+    if (support.verdict === "weak") {
+      warnings.push(
+        `claim weakly supported by its source: "${c.claim.slice(0, 60)}" (${support.reason})`,
+      );
     }
   }
 
   return { errors, warnings };
+}
+
+const ARABIC_RE = /[\u0600-\u06FF]/;
+const LATIN_RE = /[A-Za-z]/;
+/** Figures worth grounding: money, percentages, counts, years, version-like. */
+const FIGURE_RE = /[$€£]?\d[\d,]*(?:\.\d+)?\s*[%$€£]?|\b\d{4}\b|\b\d+(?:[.,]\d+)?\s*[KkMm]\b/g;
+
+/**
+ * Fold away the differences that should not count as different words:
+ * case, Arabic tashkēl/tatweel, the alef and yā' variants, ta-marbuta, and the
+ * definite article. Without this, «اَلْمَصَادِر» and «المصادر» look unrelated.
+ */
+function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, "")
+    .replace(/[\u0622\u0623\u0625\u0671]/g, "\u0627")
+    .replace(/\u0629/g, "\u0647")
+    .replace(/\u0649/g, "\u064A")
+    .replace(/\u0623/g, "\u0627");
+}
+
+function wordSet(s: string, minLength: number): Set<string> {
+  const words = normalizeForMatch(s).match(/[\p{L}\p{N}]+/gu) ?? [];
+  const out = new Set<string>();
+  for (const raw of words) {
+    // Strip a leading definite article so "المصادر" matches "مصادر".
+    const w = raw.startsWith("\u0627\u0644") && raw.length > 4 ? raw.slice(2) : raw;
+    if (w.length >= minLength) out.add(w);
+  }
+  return out;
+}
+
+/** Which script dominates a string: "arabic", "latin", or "other". */
+function dominantScript(s: string): "arabic" | "latin" | "other" {
+  const letters = normalizeForMatch(s).match(/\p{L}/gu) ?? [];
+  if (letters.length === 0) return "other";
+  let arabic = 0;
+  let latin = 0;
+  for (const ch of letters) {
+    if (ARABIC_RE.test(ch)) arabic++;
+    else if (LATIN_RE.test(ch)) latin++;
+  }
+  const total = arabic + latin;
+  if (total === 0) return "other";
+  return arabic / total >= 0.5 ? "arabic" : "latin";
+}
+
+export type ClaimVerdict =
+  /** Meaningful overlap, or every figure in the claim found its source. */
+  | "grounded"
+  /** A check ran and the claim did not pass it. */
+  | "weak"
+  /** No check could run (no excerpt, or nothing comparable to check). */
+  | "unverifiable";
+
+export interface ClaimSupport {
+  verdict: ClaimVerdict;
+  /** Machine-readable failure cause; absent when grounded or unverifiable. */
+  reason?: "no-lexical-overlap" | "figure-not-in-excerpt" | "all-figures-missing";
+  /** Fraction of comparable items that matched, when a ratio was computed. */
+  ratio?: number;
+  /** How many items the check actually compared. */
+  checked?: number;
+}
+
+/**
+ * Decide whether a claim is supported by the excerpt it cites.
+ *
+ * Two regimes, because one rule cannot serve both:
+ *
+ * - **Same script** — lexical overlap is meaningful, so compare normalized word
+ *   sets. Arabic folding (tashkēl, alef/yā' variants, ta-marbuta, the definite
+ *   article) is applied first, otherwise ordinary Arabic prose scores ~0.
+ * - **Different script** — an Arabic claim citing an English excerpt has no
+ *   lexical overlap *by construction*, so warning about it is a false positive
+ *   on every single claim. Lexical comparison is meaningless here; the honest
+ *   check is on the figures the claim asserts, because a claim that says "30%"
+ *   must have "30%" in its source.
+ */
+export function assessClaimSupport(
+  claim: string,
+  excerpt: string,
+): ClaimSupport {
+  const claimTrimmed = claim.trim();
+  if (!claimTrimmed || !excerpt.trim()) return { verdict: "unverifiable" };
+
+  const claimScript = dominantScript(claimTrimmed);
+  const excerptScript = dominantScript(excerpt);
+
+  if (claimScript !== "other" && excerptScript !== "other" && claimScript !== excerptScript) {
+    const figures = [
+      ...new Set(claimTrimmed.match(FIGURE_RE) ?? []),
+    ].map((f) => f.trim());
+    if (figures.length === 0) {
+      // Cross-language and figure-free: nothing comparable, so nothing to warn about.
+      return { verdict: "unverifiable", checked: 0 };
+    }
+    const haystack = normalizeForMatch(excerpt);
+    const missing = figures.filter((f) => !haystack.includes(normalizeForMatch(f)));
+    if (missing.length === 0) {
+      return { verdict: "grounded", checked: figures.length, ratio: 1 };
+    }
+    if (missing.length === figures.length) {
+      return {
+        verdict: "weak",
+        reason: "all-figures-missing",
+        checked: figures.length,
+        ratio: 0,
+      };
+    }
+    return {
+      verdict: "weak",
+      reason: "figure-not-in-excerpt",
+      checked: figures.length,
+      ratio: (figures.length - missing.length) / figures.length,
+    };
+  }
+
+  const claimWords = wordSet(claimTrimmed, 4);
+  if (claimWords.size === 0) return { verdict: "unverifiable", checked: 0 };
+  const excerptWords = wordSet(excerpt, 1);
+
+  let overlap = 0;
+  for (const w of claimWords) if (excerptWords.has(w)) overlap++;
+  const ratio = overlap / claimWords.size;
+
+  return ratio >= MIN_LEXICAL_OVERLAP
+    ? { verdict: "grounded", ratio, checked: claimWords.size }
+    : { verdict: "weak", reason: "no-lexical-overlap", ratio, checked: claimWords.size };
 }
 
 async function ensureUniqueSlug(desired: string): Promise<string> {
