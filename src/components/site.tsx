@@ -7,11 +7,6 @@ const NAV = [
   { href: "/standards", label: "المعايير" },
 ];
 
-const MORE = [
-  { href: "/corrections", label: "التصحيحات" },
-  { href: "/about", label: "عن الموقع" },
-];
-
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-ink-line bg-ink/85 backdrop-blur-md">
@@ -37,7 +32,7 @@ export function SiteHeader() {
                 name="q"
                 type="search"
                 placeholder="ابحث…"
-                className="w-36 border border-ink-line bg-ink-raise px-3 py-1.5 text-sm text-paper placeholder:text-paper-dim focus:w-52 transition-all focus:border-signal focus:outline-none"
+                className="w-32 border border-ink-line bg-ink-raise px-3 py-1.5 text-sm text-paper placeholder:text-paper-dim focus:w-48 transition-all focus:border-signal focus:outline-none"
               />
             </form>
 
@@ -51,33 +46,6 @@ export function SiteHeader() {
                   {n.label}
                 </Link>
               ))}
-            </nav>
-          </div>
-        </div>
-      </div>
-      {/* Secondary bar — the reference links, always one click away. */}
-      <div className="border-t border-ink-line/70 bg-ink-raise/40">
-        <div className="mx-auto max-w-6xl px-5 sm:px-6">
-          <div className="flex h-8 items-center justify-between gap-4 text-[11px] text-paper-dim">
-            <p className="font-mono truncate" dir="ltr">
-              {"// أخبار وشرح ومصطلحات وكلاء الذكاء الاصطناعي"}
-            </p>
-            <nav className="flex items-center gap-4 shrink-0">
-              {MORE.map((n) => (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  className="hover:text-paper transition-colors"
-                >
-                  {n.label}
-                </Link>
-              ))}
-              <Link href="/feed.xml" className="font-mono hover:text-signal transition-colors" dir="ltr">
-                rss
-              </Link>
-              <Link href="/llms.txt" className="font-mono hover:text-signal transition-colors" dir="ltr">
-                llms.txt
-              </Link>
             </nav>
           </div>
         </div>
@@ -117,7 +85,7 @@ const COLUMNS = [
 export function SiteFooter() {
   return (
     <footer className="mt-24 border-t border-ink-line">
-      <div className="mx-auto max-w-6xl px-5 sm:px-6 py-12">
+      <div className="mx-auto max-w-6xl px-5 sm:px-6 py-14">
         <div className="grid gap-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
           <div>
             <p className="font-display text-lg font-bold">
@@ -142,12 +110,6 @@ export function SiteFooter() {
               </ul>
             </div>
           ))}
-        </div>
-      </div>
-      <div className="border-t border-ink-line">
-        <div className="mx-auto max-w-6xl px-5 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3 font-mono text-[11px] text-paper-dim">
-          <span dir="ltr">{"// أخبار وشرح ومصطلحات — كل مادة بمصادرها"}</span>
-          <span dir="ltr">{`lang="ar" dir="rtl" · Next.js · Cloudflare`}</span>
         </div>
       </div>
     </footer>
