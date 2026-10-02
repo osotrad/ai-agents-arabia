@@ -1,0 +1,37 @@
+name: Fetch live page
+
+# Fetches a public page from the deployed site and prints its text content.
+# For hosts that cannot reach *.workers.dev directly.
+
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: "Path to fetch, e.g. /news/gemini-4-argon-launch"
+        required: true
+        default: /
+        type: string
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch and strip HTML
+        env:
+          BASE: ${{ vars.SITE_URL }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -m 40 -o page.html -w '%{http_code}' "$BASE${{ inputs.path }}")
+          echo "GET $BASE${{ inputs.path }} -> HTTP $code"
+          [ "$code" = "200" ] || exit 1
+          python3 - <<'PY'
+          import html, re
+          s = open("page.html", encoding="utf-8").read()
+          s = re.sub(r"(?is)<script.*?</script>", " ", s)
+          s = re.sub(r"(?s)<style.*?</style>", " ", s)
+          s = re.sub(r"(?s)<[^>]+>", " ", s)
+          s = html.unescape(s)
+          s = re.sub(r"[ \t]+", " ", s)
+          print(re.sub(r"\n\s*\n+", "\n", s).strip())
+          PY
