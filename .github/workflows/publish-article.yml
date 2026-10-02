@@ -1,0 +1,139 @@
+name: Publish article via MCP
+
+# Publishes one article through the site's own MCP interface
+# (POST {SITE_URL}/api/mcp). Useful when the publishing host cannot reach
+# *.workers.dev directly — GitHub runners can.
+#
+# The article is supplied as a base64-encoded JSON payload so a long Arabic body
+# survives the dispatch input, and is never echoed into the job log.
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload_b64:
+        description: "Base64 of the article JSON (titleAr, excerptAr, bodyMd, type, sources[], claims[], ...)"
+        required: true
+        type: string
+      mode:
+        description: "validate = dry run | create = leave as pending_review | publish = create and publish"
+        required: true
+        default: validate
+        type: choice
+        options: [validate, create, publish]
+
+concurrency:
+  group: publish-article
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      MCP_URL: ${{ vars.SITE_URL }}/api/mcp
+      API_KEY: ${{ secrets.AGENT_API_KEY }}
+
+    steps:
+      - name: Check configuration
+        run: |
+          set -euo pipefail
+          [ -n "${API_KEY:-}" ]  || { echo "::error::AGENT_API_KEY secret is not set"; exit 1; }
+          [ -n "${MCP_URL:-}" ] || { echo "::error::SITE_URL repository variable is not set"; exit 1; }
+          echo "endpoint: ${MCP_URL}"
+
+      - name: Decode payload
+        run: |
+          set -euo pipefail
+          printf '%s' '${{ inputs.payload_b64 }}' | base64 -d > article.json
+          python3 - <<'PY'
+          import json
+          d = json.load(open("article.json"))
+          print("type    :", d.get("type"))
+          print("slug    :", d.get("slug"))
+          print("sources :", len(d.get("sources", [])))
+          print("claims  :", len(d.get("claims", [])))
+          print("titleAr :", d.get("titleAr"))
+          PY
+
+      - name: Install MCP caller
+        run: |
+          set -euo pipefail
+          cat > call.sh <<'SH'
+          #!/usr/bin/env bash
+          # usage: call.sh <tool_name> <arguments-json>
+          set -euo pipefail
+          tool="$1"; args="${2:-{\}}"
+          body=$(python3 -c '
+          import json, sys
+          print(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                            "params": {"name": sys.argv[1],
+                                       "arguments": json.loads(sys.argv[2])}}))
+          ' "$tool" "$args")
+          code=$(curl -sS -m 60 -o resp.sse -w '%{http_code}' \
+            -X POST "$MCP_URL" \
+            -H "Authorization: Bearer $API_KEY" \
+            -H "content-type: application/json" \
+            -H "accept: application/json, text/event-stream" \
+            -d "$body")
+          if [ "$code" != "200" ]; then
+            echo "::error::HTTP $code from MCP"; cat resp.sse; exit 1
+          fi
+          sed -n 's/^data: //p' resp.sse > resp.json
+          python3 -c '
+          import json
+          r = json.load(open("resp.json"))
+          res = r.get("result", {})
+          print(res.get("content", [{}])[0].get("text", "")[:4000])
+          raise SystemExit(1 if res.get("isError") else 0)
+          '
+          SH
+          chmod +x call.sh
+
+      - name: MCP initialize
+        run: |
+          set -euo pipefail
+          curl -sS -m 60 -o /dev/null -w 'initialize -> HTTP %{http_code}\n' \
+            -X POST "$MCP_URL" \
+            -H "Authorization: Bearer $API_KEY" \
+            -H "content-type: application/json" \
+            -H "accept: application/json, text/event-stream" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"publish-workflow","version":"1"}}}'
+
+      - name: validate_article
+        if: inputs.mode == 'validate'
+        run: ./call.sh validate_article "$(cat article.json)"
+
+      - name: create_article
+        id: create
+        if: inputs.mode != 'validate'
+        run: ./call.sh create_article "$(cat article.json)"
+
+      - name: publish_article
+        if: inputs.mode == 'publish' && steps.create.outcome == 'success'
+        run: |
+          set -euo pipefail
+          slug=$(jq -r '.slug // empty' article.json)
+          if [ -z "$slug" ]; then
+            echo "::error::payload has no slug; publish_article needs an idOrSlug"
+            exit 1
+          fi
+          ./call.sh publish_article "$(jq -nc --arg s "$slug" '{idOrSlug: $s}')"
+
+      - name: Verify it is live
+        if: inputs.mode == 'publish'
+        run: |
+          set -euo pipefail
+          slug=$(jq -r '.slug' article.json)
+          code=$(curl -sS -m 30 -o /dev/null -w '%{http_code}' "${SITE_URL:-https://ai-agents-arabia.osotrad101.workers.dev}/news/$slug")
+          echo "GET /news/$slug -> HTTP $code"
+          [ "$code" = "200" ] || { echo "::error::article not publicly reachable"; exit 1; }
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### MCP publish — mode \`${{ inputs.mode }}\`"
+            echo ""
+            echo "- create step: \`${{ steps.create.outcome || 'skipped' }}\`"
+            echo "- site: \`${{ vars.SITE_URL }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
