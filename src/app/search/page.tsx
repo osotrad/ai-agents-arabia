@@ -3,6 +3,7 @@ import { desc, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
+  ArticleThumbnail,
   Container,
   EmptyState,
   PageHeader,
@@ -41,6 +42,8 @@ export default async function SearchPage({
           type: articles.type,
           publishedAt: articles.publishedAt,
           confidenceScore: articles.confidenceScore,
+          imageUrl: articles.imageUrl,
+          imageAlt: articles.imageAlt,
         })
         .from(articles)
         .where(
@@ -122,17 +125,19 @@ export default async function SearchPage({
             <ul className="divide-y divide-ink-line border-y border-ink-line">
               {results.map((r) => (
                 <li key={r.id} className="py-5">
-                  <Link
-                    href={`/news/${r.slug}`}
-                    className="font-semibold hover:text-signal transition-colors"
-                  >
-                    {r.titleAr}
+                  <Link href={`/news/${r.slug}`} className="group flex gap-5">
+                    <ArticleThumbnail article={r} />
+                    <div className="min-w-0">
+                      <span className="font-semibold group-hover:text-signal transition-colors">
+                        {r.titleAr}
+                      </span>
+                      {r.excerptAr && (
+                        <p className="mt-1.5 text-sm text-paper-dim line-clamp-2">
+                          {r.excerptAr}
+                        </p>
+                      )}
+                    </div>
                   </Link>
-                  {r.excerptAr && (
-                    <p className="mt-1.5 text-sm text-paper-dim line-clamp-2">
-                      {r.excerptAr}
-                    </p>
-                  )}
                 </li>
               ))}
             </ul>

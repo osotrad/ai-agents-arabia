@@ -3,6 +3,7 @@ import { desc, eq, asc, sql } from "drizzle-orm";
 import Link from "next/link";
 import {
   ArticleCard,
+  ArticleThumbnail,
   Container,
   Eyebrow,
   SectionHeading,
@@ -37,6 +38,8 @@ async function load(): Promise<HomeData> {
           type: articles.type,
           publishedAt: articles.publishedAt,
           confidenceScore: articles.confidenceScore,
+        imageUrl: articles.imageUrl,
+        imageAlt: articles.imageAlt,
         })
         .from(articles)
         .where(eq(articles.status, "published"))
@@ -223,16 +226,14 @@ export default async function Home() {
               <ul className="divide-y divide-ink-line border-t border-ink-line">
                 {rest.slice(0, 5).map((a) => (
                   <li key={a.id} className="group py-4 first:pt-0">
-                    <div className="flex items-start gap-4">
-                      <p className="font-mono text-[11px] text-paper-dim shrink-0 pt-1 w-20" dir="ltr">
-                        {isoDate(a.publishedAt)}
-                      </p>
-                      <div>
-                        <p className="font-mono text-[11px] text-signal">
-                          {typeLabel(a.type)}
+                    <Link href={`/news/${a.slug}`} className="flex items-start gap-4">
+                      <ArticleThumbnail article={a} />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-mono text-[11px] text-paper-dim" dir="ltr">
+                          {isoDate(a.publishedAt)} · {typeLabel(a.type)}
                         </p>
                         <h3 className="mt-1 font-semibold leading-snug group-hover:text-signal transition-colors">
-                          <Link href={`/news/${a.slug}`}>{a.titleAr}</Link>
+                          {a.titleAr}
                         </h3>
                         {a.excerptAr && (
                           <p className="mt-1 text-xs text-paper-dim line-clamp-2 leading-relaxed">
@@ -240,7 +241,7 @@ export default async function Home() {
                           </p>
                         )}
                       </div>
-                    </div>
+                    </Link>
                   </li>
                 ))}
               </ul>

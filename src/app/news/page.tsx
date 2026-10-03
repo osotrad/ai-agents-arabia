@@ -41,6 +41,8 @@ export default async function NewsPage({
         type: articles.type,
         publishedAt: articles.publishedAt,
         confidenceScore: articles.confidenceScore,
+        imageUrl: articles.imageUrl,
+        imageAlt: articles.imageAlt,
       })
       .from(articles)
       .where(

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
+  ArticleThumbnail,
   Container,
   MetaRow,
   TypeBadge,
@@ -95,6 +96,8 @@ async function getRelated(article: { id: string; type: string }): Promise<
         type: articles.type,
         publishedAt: articles.publishedAt,
         confidenceScore: articles.confidenceScore,
+        imageUrl: articles.imageUrl,
+        imageAlt: articles.imageAlt,
       })
       .from(articles)
       .where(
@@ -193,19 +196,20 @@ export default async function ArticlePage({ params }: Params) {
           </header>
 
           {/*
-            Header image. Rendered here by the page component rather than living
-            in `bodyMd`, so the markdown sanitizer is never involved. `alt` falls
-            back to the title, which is always a safe description.
+            Header image, rendered by the page component rather than living in
+            `bodyMd`, so the markdown sanitizer is never involved. Constrained to
+            a 16:9 crop and inset rather than full-bleed, so it reads as a
+            thumbnail next to the title. `alt` falls back to the title.
           */}
           {a.imageUrl && (
-            <figure className="mt-8 -mx-5 sm:-mx-6">
+            <figure className="mt-8">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={a.imageUrl}
                 alt={a.imageAlt ?? a.titleAr}
                 loading="eager"
                 decoding="async"
-                className="w-full max-h-[26rem] object-cover border-y border-ink-line"
+                className="w-full aspect-[16/9] max-h-80 object-cover border border-ink-line bg-ink-raise"
               />
             </figure>
           )}
@@ -295,15 +299,20 @@ export default async function ArticlePage({ params }: Params) {
                 <li key={r.id} className="py-4">
                   <Link
                     href={`/news/${r.slug}`}
-                    className="font-medium hover:text-signal transition-colors"
+                    className="group flex gap-4"
                   >
-                    {r.titleAr}
+                    <ArticleThumbnail article={r} />
+                    <div className="min-w-0">
+                      <span className="font-medium group-hover:text-signal transition-colors">
+                        {r.titleAr}
+                      </span>
+                      {r.excerptAr && (
+                        <p className="mt-1 text-xs text-paper-dim line-clamp-2">
+                          {r.excerptAr}
+                        </p>
+                      )}
+                    </div>
                   </Link>
-                  {r.excerptAr && (
-                    <p className="mt-1 text-xs text-paper-dim line-clamp-2">
-                      {r.excerptAr}
-                    </p>
-                  )}
                 </li>
               ))}
             </ul>

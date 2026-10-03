@@ -142,32 +142,67 @@ export interface ArticleSummary {
   type: string;
   publishedAt?: Date | string | null;
   confidenceScore?: number | null;
+  imageUrl?: string | null;
+  imageAlt?: string | null;
 }
 
-/** Row used in list pages — type, date, title, excerpt, confidence. */
+/**
+ * Card thumbnail. Intrinsic dimensions are unknown (the agent uploaded the
+ * bytes), so the box is fixed by aspect-ratio and the image is cropped —
+ * that keeps rows from reflowing as images arrive.
+ */
+export function ArticleThumbnail({
+  article,
+  size = "sm",
+  priority = false,
+}: {
+  article: Pick<ArticleSummary, "imageUrl" | "imageAlt" | "titleAr">;
+  size?: "sm" | "md";
+  priority?: boolean;
+}) {
+  if (!article.imageUrl) return null;
+  const box = size === "md" ? "h-44 sm:h-56" : "h-20 w-28 sm:h-24 sm:w-36";
+  return (
+    <div className={`${box} shrink-0 overflow-hidden bg-ink-raise border border-ink-line`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={article.imageUrl}
+        alt={article.imageAlt ?? ""}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        className="h-full w-full object-cover"
+      />
+    </div>
+  );
+}
+
+/** Row used in list pages — thumbnail, type, date, title, excerpt, confidence. */
 export function ArticleRow({ article }: { article: ArticleSummary }) {
   return (
     <li className="group relative">
-      <Link href={`/news/${article.slug}`} className="block py-6">
-        <MetaRow
-          className="mb-2"
-          items={[
-            <TypeBadge key="t" type={article.type} />,
-            <span key="d">{isoDate(article.publishedAt)}</span>,
-            <span key="c">
-              {"conf "}
-              {confidenceLabel(article.confidenceScore)}
-            </span>,
-          ]}
-        />
-        <h3 className="text-lg font-semibold leading-snug transition-colors group-hover:text-signal">
-          {article.titleAr}
-        </h3>
-        {article.excerptAr && (
-          <p className="mt-2 text-sm text-paper-dim leading-relaxed line-clamp-2">
-            {article.excerptAr}
-          </p>
-        )}
+      <Link href={`/news/${article.slug}`} className="flex gap-5 py-6">
+        <ArticleThumbnail article={article} />
+        <div className="min-w-0 flex-1">
+          <MetaRow
+            className="mb-2"
+            items={[
+              <TypeBadge key="t" type={article.type} />,
+              <span key="d">{isoDate(article.publishedAt)}</span>,
+              <span key="c">
+                {"conf "}
+                {confidenceLabel(article.confidenceScore)}
+              </span>,
+            ]}
+          />
+          <h3 className="text-lg font-semibold leading-snug transition-colors group-hover:text-signal">
+            {article.titleAr}
+          </h3>
+          {article.excerptAr && (
+            <p className="mt-2 text-sm text-paper-dim leading-relaxed line-clamp-2">
+              {article.excerptAr}
+            </p>
+          )}
+        </div>
       </Link>
     </li>
   );
@@ -183,12 +218,13 @@ export function ArticleCard({
 }) {
   return (
     <article
-      className={`group relative border border-ink-line bg-ink-raise/60 transition-colors hover:border-signal/50 ${
+      className={`group relative flex flex-col border border-ink-line bg-ink-raise/60 transition-colors hover:border-signal/50 ${
         featured ? "p-7" : "p-5"
       }`}
     >
+      <ArticleThumbnail article={article} size={featured ? "md" : "sm"} priority={featured} />
       <MetaRow
-        className="mb-3"
+        className="mt-4 mb-3"
         items={[
           <TypeBadge key="t" type={article.type} />,
           <span key="d">{isoDate(article.publishedAt)}</span>,

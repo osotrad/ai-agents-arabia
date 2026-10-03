@@ -46,15 +46,30 @@ export interface EnvSnapshot {
 }
 
 /** Parse + validate without throwing; invalid keys fall back to defaults. */
-export function parseEnv(source: Record<string, unknown> = process.env): EnvSnapshot {
+export function parseEnv(
+  source: Record<string, unknown> = process.env,
+): EnvSnapshot {
   const parsed = envSchema.safeParse(source);
   if (parsed.success) return { data: parsed.data, issues: [] };
+
   const issues = parsed.error.issues.map(
     (i) => `${i.path.join(".") || "(root)"}: ${i.message}`,
   );
-  // Salvage the defaults so a single bad value cannot disable the whole site.
-  const data = envSchema.safeParse({});
-  return { data: data.success ? data.data : ({} as Env), issues };
+
+  // Salvage per key rather than discarding the lot: one malformed value (a short
+  // INDEXNOW_KEY, say) must not silently drop DATABASE_URL and leave the whole
+  // site reading from a placeholder and rendering empty pages.
+  const salvaged: Record<string, unknown> = {};
+  for (const [key, schema] of Object.entries(envSchema.shape)) {
+    const single = schema.safeParse(source[key]);
+    if (single.success) salvaged[key] = single.data;
+  }
+
+  const merged = envSchema.safeParse(salvaged);
+  return {
+    data: merged.success ? merged.data : ({} as Env),
+    issues,
+  };
 }
 
 let cached: EnvSnapshot | null = null;

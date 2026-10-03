@@ -25,9 +25,49 @@ describe("parseEnv", () => {
     const { data, issues } = parseEnv({ AGENT_API_KEY: "short" });
     expect(issues.length).toBeGreaterThan(0);
     expect(issues.join(" ")).toContain("AGENT_API_KEY");
-    // A bad key must not disable the site: defaults still come through.
     expect(data.DAILY_PUBLISH_CAP).toBe(5);
     expect(data.SITE_URL).toBe("http://localhost:3000");
+  });
+
+  it("salvages the other keys when one value is malformed", () => {
+    // Regression: a single bad value used to discard the whole configuration,
+    // which silently dropped DATABASE_URL and made every page render empty.
+    const { data, issues } = parseEnv({
+      DATABASE_URL: "postgres://u:p@host/db",
+      SITE_URL: "https://example.com",
+      AGENT_API_KEY: "too-short",
+      IMAGE_BUCKET: "article-images",
+    });
+    expect(issues.join(" ")).toContain("AGENT_API_KEY");
+    expect(data.DATABASE_URL).toBe("postgres://u:p@host/db");
+    expect(data.SITE_URL).toBe("https://example.com");
+    expect(data.IMAGE_BUCKET).toBe("article-images");
+    // The bad one is dropped, not carried through.
+    expect(data.AGENT_API_KEY).toBeUndefined();
+  });
+
+  it("drops only the malformed value and keeps numeric coercion", () => {
+    const { data } = parseEnv({
+      DATABASE_URL: "not a url",
+      DAILY_PUBLISH_CAP: "9",
+      SITE_NAME: "وكلاء",
+    });
+    expect(data.DATABASE_URL).toBeUndefined();
+    expect(data.DAILY_PUBLISH_CAP).toBe(9);
+    expect(data.SITE_NAME).toBe("وكلاء");
+  });
+
+  it("salvages the storage settings when an unrelated key is short", () => {
+    const { data } = parseEnv({
+      ADMIN_API_KEY: "x",
+      NEON_STORAGE_ENDPOINT: "https://b.storage.eu-central-1.aws.neon.tech",
+      NEON_STORAGE_REGION: "eu-central-1",
+      IMAGE_BUCKET: "article-images",
+    });
+    expect(data.NEON_STORAGE_ENDPOINT).toContain("neon.tech");
+    expect(data.NEON_STORAGE_REGION).toBe("eu-central-1");
+    expect(data.IMAGE_BUCKET).toBe("article-images");
+    expect(data.ADMIN_API_KEY).toBeUndefined();
   });
 
   it("coerces the publish cap", () => {
