@@ -7,12 +7,36 @@ const NAV = [
   { href: "/standards", label: "المعايير" },
 ];
 
+/** Brand mark. The PNG is transparent, so it sits on the ink canvas as-is. */
+export function BrandMark({
+  className = "h-9",
+  priority = false,
+}: {
+  className?: string;
+  priority?: boolean;
+}) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/logo.png"
+      alt=""
+      width={130}
+      height={160}
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
+      {...(priority ? { fetchPriority: "high" as const } : {})}
+      className={`${className} w-auto shrink-0`}
+    />
+  );
+}
+
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-ink-line bg-ink/85 backdrop-blur-md">
       <div className="mx-auto max-w-6xl px-5 sm:px-6">
         <div className="flex h-16 items-center justify-between gap-6">
-          <Link href="/" className="group flex items-baseline gap-2 shrink-0">
+          <Link href="/" className="group flex items-center gap-3 shrink-0">
+            <BrandMark className="h-9" priority />
             <span className="font-display text-xl font-extrabold tracking-tight">
               وكلاء
               <span className="text-signal transition-colors group-hover:text-paper">
@@ -76,7 +100,6 @@ const COLUMNS = [
     title: "أدوات",
     links: [
       { href: "/feed.xml", label: "خلاصة RSS" },
-      { href: "/llms.txt", label: "دليل الموقع" },
       { href: "/sitemap.xml", label: "خريطة الموقع" },
     ],
   },
@@ -88,9 +111,12 @@ export function SiteFooter() {
       <div className="mx-auto max-w-6xl px-5 sm:px-6 py-14">
         <div className="grid gap-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
           <div>
-            <p className="font-display text-lg font-bold">
-              وكلاء<span className="text-signal">.</span>
-            </p>
+            <div className="flex items-center gap-3">
+              <BrandMark className="h-11" />
+              <p className="font-display text-lg font-bold">
+                وكلاء<span className="text-signal">.</span>
+              </p>
+            </div>
             <p className="mt-3 text-sm text-paper-dim leading-relaxed max-w-xs">
               منصة عربية متخصصة في وكلاء الذكاء الاصطناعي: أخبار موثّقة، شروح،
               ومصطلحات معرّفة — كل مادة بمصادرها.
