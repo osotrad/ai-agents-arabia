@@ -28,6 +28,12 @@ jobs:
           python3 - <<'PY'
           import html, re
           s = open("page.html", encoding="utf-8").read()
+          imgs = re.findall(r'<img[^>]*>', s)
+          print(f"[images] {len(imgs)}")
+          for i in imgs[:8]:
+              src = re.search(r'src="([^"]+)"', i)
+              alt = re.search(r'alt="([^"]*)"', i)
+              print(f"  - src={(src.group(1)[:70] if src else '?')} alt={(alt.group(1)[:40] if alt else '(none)')}")
           s = re.sub(r"(?is)<script.*?</script>", " ", s)
           s = re.sub(r"(?s)<style.*?</style>", " ", s)
           s = re.sub(r"(?s)<[^>]+>", " ", s)
