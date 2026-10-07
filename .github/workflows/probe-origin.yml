@@ -1,0 +1,50 @@
+name: Probe origin allowlist
+
+# Read-only check: POSTs to /api/mcp with a deliberately invalid bearer token
+# and reports the status per Origin.
+#
+# 401 = the origin was ACCEPTED (auth is the remaining gate).
+# 403 = the origin is still BLOCKED.
+# This cannot succeed at authenticating, by design — it never sends a real key.
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "Host to test (scheme included)"
+        default: "https://wokala.vip"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe
+        env:
+          HOST: ${{ inputs.host }}
+        run: |
+          set -uo pipefail
+          body='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+          for origin in \
+            "$HOST" \
+            "https://www.wokala.vip" \
+            "https://ai-agents-arabia.osotrad101.workers.dev" \
+            "http://localhost:3000" \
+            "https://evil.example" \
+          ; do
+            code=$(curl -sS -m 40 -o /dev/null -w '%{http_code}' -X POST "$HOST/api/mcp" \
+              -H "Authorization: Bearer probe-not-a-real-key" \
+              -H "Origin: $origin" \
+              -H "Content-Type: application/json" \
+              --data "$body" 2>/dev/null || echo "000")
+            case "$code" in
+              401) verdict="ACCEPTED (auth is the gate)" ;;
+              403) verdict="BLOCKED  <-- fix EXTRA_ORIGINS" ;;
+              000) verdict="unreachable / no response" ;;
+              *)   verdict="unexpected" ;;
+            esac
+            printf "  %-52s HTTP %-4s %s\n" "$origin" "$code" "$verdict"
+          done
