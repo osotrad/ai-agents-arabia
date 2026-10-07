@@ -65,6 +65,10 @@ jobs:
           put MAX_IMAGE_BYTES             "${{ vars.MAX_IMAGE_BYTES }}"
           put NEON_STORAGE_ACCESS_KEY_ID  "${{ secrets.NEON_STORAGE_ACCESS_KEY_ID }}"
           put NEON_STORAGE_SECRET_ACCESS_KEY "${{ secrets.NEON_STORAGE_SECRET_ACCESS_KEY }}"
+          # Rolling-24h publish ceiling. A repo variable, not a secret: it is
+          # an editorial guardrail, not a credential. Left unset, the Worker
+          # falls back to the schema default of 5.
+          put DAILY_PUBLISH_CAP   "${{ vars.DAILY_PUBLISH_CAP }}"
 
       - name: Deploy to Cloudflare Workers
         id: deploy
