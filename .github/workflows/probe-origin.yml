@@ -1,11 +1,12 @@
 name: Probe origin allowlist
 
-# Read-only check: POSTs to /api/mcp with a deliberately invalid bearer token
-# and reports the status per Origin.
+# Reports whether each Origin is allowed to call /api/mcp.
 #
-# 401 = the origin was ACCEPTED (auth is the remaining gate).
-# 403 = the origin is still BLOCKED.
-# This cannot succeed at authenticating, by design — it never sends a real key.
+# The route checks auth BEFORE origin, so an invalid token yields 401 for
+# every origin and reveals nothing. This therefore uses the real agent key:
+#   200 = origin accepted
+#   403 = origin rejected by the allowlist
+# The key is only ever sent as a header and is never echoed.
 
 on:
   workflow_dispatch:
@@ -25,9 +26,11 @@ jobs:
       - name: Probe
         env:
           HOST: ${{ inputs.host }}
+          AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
         run: |
           set -uo pipefail
-          body='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+          test -n "$AGENT_API_KEY" || { echo "::error::AGENT_API_KEY unset"; exit 1; }
+          body='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
           for origin in \
             "$HOST" \
             "https://www.wokala.vip" \
@@ -36,13 +39,15 @@ jobs:
             "https://evil.example" \
           ; do
             code=$(curl -sS -m 40 -o /dev/null -w '%{http_code}' -X POST "$HOST/api/mcp" \
-              -H "Authorization: Bearer probe-not-a-real-key" \
+              -H "Authorization: Bearer $AGENT_API_KEY" \
               -H "Origin: $origin" \
               -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
               --data "$body" 2>/dev/null || echo "000")
             case "$code" in
-              401) verdict="ACCEPTED (auth is the gate)" ;;
-              403) verdict="BLOCKED  <-- fix EXTRA_ORIGINS" ;;
+              200) verdict="ACCEPTED" ;;
+              401) verdict="auth failed (key rejected)" ;;
+              403) verdict="BLOCKED  <-- not in EXTRA_ORIGINS" ;;
               000) verdict="unreachable / no response" ;;
               *)   verdict="unexpected" ;;
             esac
