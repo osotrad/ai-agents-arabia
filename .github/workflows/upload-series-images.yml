@@ -60,12 +60,16 @@ jobs:
           echo '[]' > build_uploaded.json
           while IFS=$'\t' read -r slug path alt ctype; do
             [ -z "$slug" ] && continue
-            b64=$(base64 -w0 "$path")
-            payload=$(jq -n --arg s "$slug" --arg b "$b64" --arg a "$alt" --arg c "$ctype" \
-              '{slug:$s, dataBase64:$b, alt:$a, contentType:$c}')
+            # Build the payload in a file, never as an argument: three of the
+            # diagrams exceed ARG_MAX once base64-encoded, and passing them
+            # to jq fails with "Argument list too long". stdin keeps the
+            # payload out of argv entirely, so size stops mattering.
+            base64 -w0 "$path" | jq -R -s \
+              --arg s "$slug" --arg a "$alt" --arg c "$ctype" \
+              '{slug:$s, dataBase64:., alt:$a, contentType:$c}' > payload.json
             resp=$(curl -sS -m 180 -X POST "$SITE/api/v1/images" \
               -H "Authorization: Bearer $AGENT_API_KEY" \
-              -H 'Content-Type: application/json' --data "$payload")
+              -H 'Content-Type: application/json' --data-binary @payload.json)
             if [ "$(printf '%s' "$resp" | jq -r '.ok // false')" != "true" ]; then
               echo "::error::upload failed for $slug: $resp"
               exit 1
