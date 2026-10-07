@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 const NAV = [
+  // The series is the site's most complete explainer; it leads the nav.
+  { href: "/topics/langchain", label: "السلسلة" },
   { href: "/news", label: "الأخبار" },
   { href: "/glossary", label: "المصطلحات" },
   { href: "/sources", label: "المصادر" },
@@ -99,6 +101,7 @@ const COLUMNS = [
   {
     title: "أدوات",
     links: [
+      { href: "/contact", label: "تواصل معنا" },
       { href: "/feed.xml", label: "خلاصة RSS" },
       { href: "/sitemap.xml", label: "خريطة الموقع" },
     ],

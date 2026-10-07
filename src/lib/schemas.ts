@@ -44,6 +44,21 @@ export const articleImageSchema = {
   imageUrl: httpUrl.optional(),
   /** Arabic alt text. Required in practice — the site is RTL prose. */
   imageAlt: z.string().min(5).max(300).optional(),
+  /**
+   * Editorial series this article belongs to (e.g. "langchain"). Powers the
+   * /topics/[topic] hub. Omitted or null means the article is standalone.
+   */
+  topic: z
+    .string()
+    .regex(/^[a-z0-9-]{1,64}$/, "topic must be lowercase-with-hyphens")
+    .optional()
+    .nullable(),
+  /**
+   * Position within the series. Series must read in a fixed order that does
+   * not shuffle when a later part is published, so this is explicit rather
+   * than derived from publishedAt.
+   */
+  topicOrder: z.number().int().min(1).max(999).optional().nullable(),
 };
 
 export const articleInputSchema = z.object({

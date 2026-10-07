@@ -88,6 +88,14 @@ export const articles = pgTable(
     imageUrl: text("image_url"),
     /** Arabic alt text. Required in practice: the site is RTL prose. */
     imageAlt: text("image_alt"),
+    /**
+     * Optional editorial series slug (e.g. "langchain"). Powers the
+     * /topics/[topic] hub pages, which list their members in reading order
+     * via `topicOrder`. Null means the article belongs to no series.
+     */
+    topic: varchar("topic", { length: 64 }),
+    /** Position within the series. Null = use publishedAt order. */
+    topicOrder: integer("topic_order"),
     bodyMd: text("body_md").notNull(),
     bodyHtml: text("body_html"),
     type: articleTypeEnum("type").notNull(),
@@ -209,4 +217,42 @@ export const corrections = pgTable(
       .notNull(),
   },
   (t) => [index("corrections_article_idx").on(t.articleId)],
+);
+
+/**
+ * Leads from the public /contact page.
+ *
+ * This is the site's only unauthenticated *write* path, so it is also the
+ * only spam surface. Defences live in `POST /api/v1/contact`: a honeypot
+ * field, a per-IP rate limit, and a length cap. Captcha is deliberately
+ * absent — it adds a third-party dependency and a key to rotate for a form
+ * that should receive a handful of legitimate leads, not scale.
+ *
+ * `status` is read only from the admin surface; nothing here auto-publishes.
+ */
+export const contactRequests = pgTable(
+  "contact_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    email: varchar("email", { length: 254 }).notNull(),
+    /** Which article's CTA brought them in, for attribution. */
+    sourceSlug: varchar("source_slug", { length: 255 }),
+    kind: varchar("kind", { length: 32 }).notNull().default("agent"),
+    message: text("message").notNull(),
+    status: varchar("status", { length: 32 }).notNull().default("new"),
+    /**
+     * Salted SHA-256 of the submitter's IP, used only to count submissions
+     * per hour. Nullable and never rendered: a marked row carries no message.
+     */
+    ipHash: varchar("ip_hash", { length: 32 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("contact_requests_created_idx").on(t.createdAt),
+    index("contact_requests_status_idx").on(t.status),
+    index("contact_requests_ip_idx").on(t.ipHash),
+  ],
 );

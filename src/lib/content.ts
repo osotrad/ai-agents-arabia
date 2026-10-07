@@ -347,6 +347,8 @@ export async function createArticle(input: ArticleInput, actor: AuditActor) {
       excerptAr: input.excerptAr ?? null,
       imageUrl: input.imageUrl ?? null,
       imageAlt: input.imageAlt ?? null,
+      topic: input.topic ?? null,
+      topicOrder: input.topicOrder ?? null,
       bodyMd: input.bodyMd,
       bodyHtml,
       type: input.type,
