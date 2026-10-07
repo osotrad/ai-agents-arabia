@@ -5,7 +5,7 @@ import {
 import * as z from "zod/v4";
 import { mcpAuthInfo } from "@/lib/auth";
 import { uploadArticleImage } from "@/lib/images";
-import { siteUrl } from "@/lib/env";
+import { extraOrigins, siteUrl } from "@/lib/env";
 import {
   createArticle,
   findSimilarArticles,
@@ -332,7 +332,15 @@ const handler = createMcpHandler(() => {
   return server;
 });
 
-/** Allowed browser origins; non-browser clients (no Origin) always pass. */
+/**
+ * Allowed browser origins; non-browser clients (no Origin) always pass.
+ *
+ * The Origin header is a CSRF defence for browser-based MCP clients: a page on
+ * an unlisted origin cannot make the browser attach a caller's bearer token.
+ * Because that defence keys on host, a site served on more than one domain
+ * must list every one of them — otherwise legitimate callers on the second
+ * domain are refused with 403.
+ */
 function allowedOrigins(): string[] {
   const origins = [
     "http://localhost:3000",
@@ -345,7 +353,20 @@ function allowedOrigins(): string[] {
   } catch {
     /* unset or malformed SITE_URL — local origins only */
   }
-  return origins;
+  // Normalised through URL() so "https://wokala.vip/" and "https://wokala.vip"
+  // collapse to one entry, and a bare host gains the right scheme.
+  for (const raw of (extraOrigins() ?? "").split(",")) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    try {
+      origins.push(new URL(trimmed).origin);
+    } catch {
+      // A malformed entry must not silently widen the allowlist to "*", so it
+      // is dropped; health reports it so the operator notices.
+      console.error(`EXTRA_ORIGINS entry is not a valid URL: ${trimmed}`);
+    }
+  }
+  return [...new Set(origins)];
 }
 
 async function serve(req: Request): Promise<Response> {

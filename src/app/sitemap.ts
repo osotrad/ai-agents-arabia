@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { canonicalUrl } from "@/lib/env";
 import { db, articles, glossaryTerms } from "@/db";
 import { desc, eq } from "drizzle-orm";
 
@@ -6,7 +7,7 @@ import { desc, eq } from "drizzle-orm";
 const FALLBACK_SITE_URL = "https://ai-agents-arabia.osotrad101.workers.dev";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = process.env.SITE_URL ?? FALLBACK_SITE_URL;
+  const base = canonicalUrl() || FALLBACK_SITE_URL;
 
   const statics: MetadataRoute.Sitemap = [
     { url: base, changeFrequency: "hourly", priority: 1 },

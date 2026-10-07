@@ -132,3 +132,38 @@ describe("toVectorLiteral", () => {
     expect(toVectorLiteral([Number.NaN, Infinity, 0])).toBe("[0,0,0]");
   });
 });
+describe("multi-domain origins", () => {
+  it("accepts EXTRA_ORIGINS and defaults both new vars to unset", () => {
+    const { data, issues } = parseEnv({
+      DATABASE_URL: "postgres://u:p@h/db",
+      AGENT_API_KEY: "a".repeat(24),
+      SITE_URL: "https://workers.example.workers.dev",
+    });
+    // Unset by default: a single-domain deployment needs no extra config.
+    expect(data.CANONICAL_URL).toBeUndefined();
+    expect(data.EXTRA_ORIGINS).toBeUndefined();
+    expect(issues).toEqual([]);
+  });
+
+  it("keeps a comma-separated EXTRA_ORIGINS list intact", () => {
+    const { data, issues } = parseEnv({
+      DATABASE_URL: "postgres://u:p@h/db",
+      AGENT_API_KEY: "a".repeat(24),
+      SITE_URL: "https://workers.example.workers.dev",
+      EXTRA_ORIGINS: "https://wokala.vip, https://www.wokala.vip",
+      CANONICAL_URL: "https://wokala.vip",
+    });
+    expect(issues).toEqual([]);
+    expect(data.EXTRA_ORIGINS).toBe("https://wokala.vip, https://www.wokala.vip");
+    expect(data.CANONICAL_URL).toBe("https://wokala.vip");
+  });
+
+  it("rejects a malformed CANONICAL_URL rather than defaulting it", () => {
+    const { issues } = parseEnv({
+      DATABASE_URL: "postgres://u:p@h/db",
+      AGENT_API_KEY: "a".repeat(24),
+      CANONICAL_URL: "not-a-url",
+    });
+    expect(issues.join(" ")).toContain("CANONICAL_URL");
+  });
+});

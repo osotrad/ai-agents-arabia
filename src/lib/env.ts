@@ -30,6 +30,19 @@ const envSchema = z.object({
   /** Max bytes accepted per image upload (default 5 MB). */
   MAX_IMAGE_BYTES: z.coerce.number().int().positive().default(5_242_880),
   SITE_URL: z.string().url().default("http://localhost:3000"),
+  /**
+   * Canonical origin, used for canonical tags, sitemap and RSS. May differ
+   * from SITE_URL when a vanity domain fronts the Worker — see
+   * EXTRA_ORIGINS for every additional origin that is allowed to call /api/mcp.
+   */
+  CANONICAL_URL: z.string().url().optional(),
+  /**
+   * Extra browser origins permitted to call /api/mcp, comma-separated.
+   * Required when the site is reachable on more than one host: the MCP route
+   * rejects any `Origin` header that is not localhost or SITE_URL's origin, so
+   * a second domain fails with 403 even with a valid bearer token.
+   */
+  EXTRA_ORIGINS: z.string().optional(),
   SITE_NAME: z.string().default("وكلاء"),
   /** Max articles the agent may auto-publish per rolling 24h. */
   DAILY_PUBLISH_CAP: z.coerce.number().int().positive().default(5),
@@ -111,6 +124,19 @@ export function indexNowKey(): string | undefined {
 
 export function siteUrl(): string {
   return env().SITE_URL;
+}
+
+/** Canonical origin for metadata. Falls back to SITE_URL when unset. */
+export function canonicalUrl(): string {
+  return env().CANONICAL_URL ?? env().SITE_URL;
+}
+
+/**
+ * Comma-separated extra origins allowed to call /api/mcp. Empty when unset,
+ * which is the correct state for a single-domain deployment.
+ */
+export function extraOrigins(): string | undefined {
+  return env().EXTRA_ORIGINS;
 }
 
 export function siteName(): string {

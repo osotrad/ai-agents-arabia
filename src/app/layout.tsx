@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Arabic, IBM_Plex_Mono, Sora } from "next/font/google";
 import { SiteHeader, SiteFooter } from "@/components/site";
-import { siteName, siteUrl } from "@/lib/env";
+import { canonicalUrl, siteName } from "@/lib/env";
 import "./globals.css";
 
 const plexArabic = IBM_Plex_Sans_Arabic({
@@ -23,7 +23,10 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl()),
+  // CANONICAL_URL, not SITE_URL: on a multi-domain deployment the vanity
+  // domain must win, or every absolute metadata URL (og:url, twitter:image,
+  // canonical) resolves to the workers.dev host and splits SEO signals.
+  metadataBase: new URL(canonicalUrl()),
   title: {
     default: "وكلاء — ذكاء اصطناعي بالعربية",
     template: "%s — وكلاء",

@@ -1,5 +1,5 @@
 import { GUIDELINES } from "@/lib/content";
-import { siteUrl } from "@/lib/env";
+import { canonicalUrl } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
  * Public: a discovery aid, so it is intentionally unauthenticated.
  */
 export async function GET() {
-  const base = siteUrl();
+  const base = canonicalUrl();
   const body = `# وكلاء — ai-agents-arabia
 
 > موقع عربي متخصص في وكلاء الذكاء الاصطناعي: أخبار موثّقة، شروح، ومصطلحات معرّفة.

@@ -69,6 +69,12 @@ jobs:
           # an editorial guardrail, not a credential. Left unset, the Worker
           # falls back to the schema default of 5.
           put DAILY_PUBLISH_CAP   "${{ vars.DAILY_PUBLISH_CAP }}"
+          # Extra browser origins allowed to call /api/mcp. Required whenever the
+          # site answers on more than one host — a browser-based MCP client on an
+          # unlisted origin is refused with 403 even when the bearer token is valid.
+          put EXTRA_ORIGINS       "${{ vars.EXTRA_ORIGINS }}"
+          # Canonical origin for metadata/sitemap. Unset means SITE_URL is used.
+          put CANONICAL_URL       "${{ vars.CANONICAL_URL }}"
 
       - name: Deploy to Cloudflare Workers
         id: deploy
