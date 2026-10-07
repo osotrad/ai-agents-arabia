@@ -1,74 +1,88 @@
-[
- {
-  "slug": "langchain-langgraph-arabic-guide",
-  "file": "core_agent_loop.png",
-  "sourceUrl": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/core_agent_loop.png",
-  "sha256": "bc9a6da6d79b858ffe86bc0190710a5539022b6b7dd5ded4e4983f91638fb59c",
-  "bytes": 30223,
-  "contentType": "image/png",
-  "alt": "مخطط يوضّح حلقة الوكيل الأساسية: النموذج يقرّر هل يستدعي أداة، تُنفَّذ الأداة وتعود نتيجتها إلى النموذج، وتتكرر الحلقة حتى يتوقف النموذج عن طلب الأدوات."
+{
+ "_note": {
+  "license": "MIT (LangChain docs, langchain-ai/docs). Diagrams modified: width capped at 1600px and PNG re-encoded without metadata; agent_model_harness rasterized from SVG because the upload API rejects image/svg+xml.",
+  "why": "Committed to the repo rather than fetched at upload time: GitHub runners have no SVG rasterizer, and langchain-ai/docs can reorganise its image paths without notice. Pinning the bytes here makes the pipeline reproducible and offline-verifiable."
  },
- {
-  "slug": "langchain-vs-langgraph",
-  "file": "agent_workflow.png",
-  "sourceUrl": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/agent_workflow.png",
-  "sha256": "925160425318d1649b8240b03376c344cb856d4443b37938df1288bf51286034",
-  "bytes": 662020,
-  "contentType": "image/png",
-  "alt": "رسم بياني يقارن مسارات سير العمل التي خطواتها محدّدة مسبقاً بمسار الوكيل الديناميكي الذي يقرّر خطواته بنفسه ويختار أدواته في كل دورة."
- },
- {
-  "slug": "langchain-standard-model-interface",
-  "file": "augmented_llm.png",
-  "sourceUrl": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/augmented_llm.png",
-  "sha256": "98a1398f3b5b393b99967304122e9bd4605b8b11139ee42fc172da1317cfc11a",
-  "bytes": 97799,
-  "contentType": "image/png",
-  "alt": "النموذج اللغوي في المركز، وتحيط به ثلاث طبقات إضافة: المخرجات المهيكلة عبر with_structured_output، استدعاء الأدوات عبر bind_tools، والذاكرة قصيرة المدى."
- },
- {
-  "slug": "langchain-tools-and-tool-calling",
-  "file": "agent.png",
-  "sourceUrl": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/agent.png",
-  "sha256": "a56d00895736cbad467d0cd69bb5a0c66244161e83db5ceec98014c9395f144d",
-  "bytes": 81607,
-  "contentType": "image/png",
-  "alt": "حلقة وكيل مجرّدة: النموذج يختار أدواته ويقرّر متى يتوقف، والأدوات ترجع ملاحظات تُعاد إلى النموذج في الدورة التالية."
- },
- {
-  "slug": "langchain-create-agent-and-middleware",
-  "file": "middleware_final.png",
-  "sourceUrl": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/middleware_final.png",
-  "sha256": "a739d45d22d67f2e87a114fd26908b044aa124b8b0ceb0b625df2a7875d29e1f",
-  "bytes": 43587,
-  "contentType": "image/png",
-  "alt": "مخطط يوضّح مواضع الخطّافات الستة حول حلقة النموذج، مع указа اللحظة التي يعمل فيها كل خطّاف داخل الدورة."
- },
- {
-  "slug": "langgraph-state-checkpoints-and-memory",
-  "file": "short-vs-long.png",
-  "sourceUrl": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/short-vs-long.png",
-  "sha256": "1aa5f6e21b509f4aab076ca0fe125d0cbf993fd2b07d6c726186905a879d4e09",
-  "bytes": 41501,
-  "contentType": "image/png",
-  "alt": "رسم يقابل الذاكرة قصيرة المدى المحصورة في محادثة واحدة بالذاكرة طويلة المدى المشتركة عبر محادثات متعددة وتُخزَّن في نطاقات مُسمّاة."
- },
- {
-  "slug": "langgraph-workflows-and-interrupts",
-  "file": "evaluator_optimizer.png",
-  "sourceUrl": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/evaluator_optimizer.png",
-  "sha256": "f4808141bc160085a04c2b1afa9c53247277e6479e734e1d3d3a409e508031e7",
-  "bytes": 35321,
-  "contentType": "image/png",
-  "alt": "مخطط يوضّح مولّداً ينتج مسودة، ومقيّماً يحكم عليها، ومساراً مرفوضاً يعود بالمحلاحظات إلى المولّد."
- },
- {
-  "slug": "build-your-first-langgraph-agent-end-to-end",
-  "file": "agent_model_harness.png",
-  "sourceUrl": "local:rasterized-from agent_model_harness.svg (ImageMagick, density 300)",
-  "sha256": "4ecce7cd651efbf0d29c1d5e8652ef88f652176672c33a7eec585af6e4cd8d0a",
-  "bytes": 205686,
-  "contentType": "image/png",
-  "alt": "مخطط يوضّح تركيبة الوكيل: النموذج اللغوي في المركز، تحيط به الأدوات والموجّه النظامي والوسيط البرمجي وحالة الوكيل."
- }
-]
+ "images": [
+  {
+   "slug": "langchain-langgraph-arabic-guide",
+   "file": "core_agent_loop.png",
+   "path": "content/langchain/images/core_agent_loop.png",
+   "sha256": "bc9a6da6d79b858ffe86bc0190710a5539022b6b7dd5ded4e4983f91638fb59c",
+   "bytes": 30223,
+   "contentType": "image/png",
+   "alt": "مخطط يوضّح حلقة الوكيل الأساسية: النموذج يقرّر هل يستدعي أداة، تُنفَّذ الأداة وتعود نتيجتها إلى النموذج، وتتكرر الحلقة حتى يتوقف النموذج عن طلب الأدوات.",
+   "upstream": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/core_agent_loop.png"
+  },
+  {
+   "slug": "langchain-vs-langgraph",
+   "file": "agent_workflow.png",
+   "path": "content/langchain/images/agent_workflow.png",
+   "sha256": "de49d8bc9ca53e16ca07e8bc9e1b74abda8655c8a9cd602c49be340ba1b54ebf",
+   "bytes": 259282,
+   "contentType": "image/png",
+   "alt": "رسم بياني يقارن مسارات سير العمل التي خطواتها محدّدة مسبقاً بمسار الوكيل الديناميكي الذي يقرّر خطواته بنفسه ويختار أدواته في كل دورة.",
+   "upstream": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/agent_workflow.png"
+  },
+  {
+   "slug": "langchain-standard-model-interface",
+   "file": "augmented_llm.png",
+   "path": "content/langchain/images/augmented_llm.png",
+   "sha256": "98a1398f3b5b393b99967304122e9bd4605b8b11139ee42fc172da1317cfc11a",
+   "bytes": 97799,
+   "contentType": "image/png",
+   "alt": "النموذج اللغوي في المركز، وتحيط به ثلاث طبقات إضافة: المخرجات المهيكلة عبر with_structured_output، استدعاء الأدوات عبر bind_tools، والذاكرة قصيرة المدى.",
+   "upstream": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/augmented_llm.png"
+  },
+  {
+   "slug": "langchain-tools-and-tool-calling",
+   "file": "agent.png",
+   "path": "content/langchain/images/agent.png",
+   "sha256": "92332a7c7304673009ad339f41199d3725d4d5ca84cb3fdff7c9153201d87ba1",
+   "bytes": 103862,
+   "contentType": "image/png",
+   "alt": "حلقة وكيل مجرّدة: النموذج يختار أدواته ويقرّر متى يتوقف، والأدوات ترجع ملاحظات تُعاد إلى النموذج في الدورة التالية.",
+   "upstream": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/agent.png"
+  },
+  {
+   "slug": "langchain-create-agent-and-middleware",
+   "file": "middleware_final.png",
+   "path": "content/langchain/images/middleware_final.png",
+   "sha256": "a739d45d22d67f2e87a114fd26908b044aa124b8b0ceb0b625df2a7875d29e1f",
+   "bytes": 43587,
+   "contentType": "image/png",
+   "alt": "مخطط يوضّح مواضع الخطّافات الستة حول حلقة النموذج، مع указа اللحظة التي يعمل فيها كل خطّاف داخل الدورة.",
+   "upstream": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/middleware_final.png"
+  },
+  {
+   "slug": "langgraph-state-checkpoints-and-memory",
+   "file": "short-vs-long.png",
+   "path": "content/langchain/images/short-vs-long.png",
+   "sha256": "1aa5f6e21b509f4aab076ca0fe125d0cbf993fd2b07d6c726186905a879d4e09",
+   "bytes": 41501,
+   "contentType": "image/png",
+   "alt": "رسم يقابل الذاكرة قصيرة المدى المحصورة في محادثة واحدة بالذاكرة طويلة المدى المشتركة عبر محادثات متعددة وتُخزَّن في نطاقات مُسمّاة.",
+   "upstream": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/short-vs-long.png"
+  },
+  {
+   "slug": "langgraph-workflows-and-interrupts",
+   "file": "evaluator_optimizer.png",
+   "path": "content/langchain/images/evaluator_optimizer.png",
+   "sha256": "f4808141bc160085a04c2b1afa9c53247277e6479e734e1d3d3a409e508031e7",
+   "bytes": 35321,
+   "contentType": "image/png",
+   "alt": "مخطط يوضّح مولّداً ينتج مسودة، ومقيّماً يحكم عليها، ومساراً مرفوضاً يعود بالمحلاحظات إلى المولّد.",
+   "upstream": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/evaluator_optimizer.png"
+  },
+  {
+   "slug": "build-your-first-langgraph-agent-end-to-end",
+   "file": "agent_model_harness.png",
+   "path": "content/langchain/images/agent_model_harness.png",
+   "sha256": "4ecce7cd651efbf0d29c1d5e8652ef88f652176672c33a7eec585af6e4cd8d0a",
+   "bytes": 205686,
+   "contentType": "image/png",
+   "alt": "مخطط يوضّح تركيبة الوكيل: النموذج اللغوي في المركز، تحيط به الأدوات والموجّه النظامي والوسيط البرمجي وحالة الوكيل.",
+   "upstream": "https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/agent_model_harness.svg"
+  }
+ ]
+}

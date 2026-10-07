@@ -1,22 +1,24 @@
 name: Upload series images
 
-# One-shot asset pipeline for the LangChain series: download each diagram from
-# its stable source, push the bytes through the site's own /api/v1/images
-# endpoint, and emit the resulting public URLs as a workflow artifact.
+# One-shot asset pipeline for the LangChain series: push each diagram through
+# the site's own /api/v1/images endpoint and emit the resulting public URLs as
+# a workflow artifact.
 #
 # Why a workflow rather than a local script: the images endpoint lives on the
 # Worker, and *.workers.dev is TLS-reset from developer machines. A runner can
-# reach it. The same reason keeps base64 payloads off `gh workflow run -f`,
-# which caps input size well below the 662 KB agent_workflow.png.
+# reach it. It also keeps base64 payloads off `gh workflow run -f`, which caps
+# input size well below the 259 KB agent_workflow.png.
 #
-# Idempotent by content hash: re-running uploads again under a fresh key, and
-# the manifest's sha256 lets you confirm the bytes never changed.
+# The bytes come from content/langchain/images/, committed to the repo, and are
+# sha256-pinned in content/langchain/images.json. Runners have no SVG
+# rasterizer and langchain-ai/docs may reorganise its image paths, so fetching
+# upstream here would be neither reproducible nor verifiable offline.
 
 on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Check sources are reachable, upload nothing"
+        description: "Verify bytes against the manifest, upload nothing"
         type: boolean
         default: false
 
@@ -30,33 +32,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download diagrams
-        id: fetch
+      - name: Verify bytes against manifest
         run: |
           set -euo pipefail
-          mkdir -p build/img
           n=0
-          while IFS=$'\t' read -r file url sha; do
-            [ -z "$file" ] && continue
-            if [[ "$url" == local:* ]]; then
-              # Rasterized locally from an SVG: fetch the SVG, convert it.
-              svg="https://raw.githubusercontent.com/langchain-ai/docs/main/src/oss/images/${file%.png}.svg"
-              echo "  rasterize $file from SVG"
-              curl -sSfL --retry 3 "$svg" -o "build/img/$file.svg"
-              convert -background none -density 300 -resize 1200x \
-                "build/img/$file.svg" "build/img/$file"
-            else
-              echo "  fetch $file"
-              curl -sSfL --retry 3 "$url" -o "build/img/$file"
-            fi
-            got=$(sha256sum "build/img/$file" | cut -d' ' -f1)
+          while IFS=$'\t' read -r path sha; do
+            [ -z "$path" ] && continue
+            got=$(sha256sum "$path" | cut -d' ' -f1)
             if [ "$got" != "$sha" ]; then
-              echo "::error::sha256 drift for $file (want $sha got $got) — upstream changed"
+              echo "::error::sha256 drift for $path (want $sha got $got)"
               exit 1
             fi
+            echo "  ok $path"
             n=$((n+1))
-          done < <(jq -r '.[] | [.file, .sourceUrl, .sha256] | @tsv' content/langchain/images.json)
-          echo "  $n diagram(s) ready"
+          done < <(jq -r '.images[] | [.path, .sha256] | @tsv' content/langchain/images.json)
+          echo "  $n diagram(s) verified"
 
       - name: Upload via the site API
         if: ${{ !inputs.dry_run }}
@@ -67,22 +57,16 @@ jobs:
           set -euo pipefail
           test -n "$SITE" || { echo "::error::SITE_URL unset"; exit 1; }
           test -n "$AGENT_API_KEY" || { echo "::error::AGENT_API_KEY unset"; exit 1; }
-          echo "[]" > build/uploaded.json
-          while IFS=$'\t' read -r slug file alt ctype; do
+          echo '[]' > build_uploaded.json
+          while IFS=$'\t' read -r slug path alt ctype; do
             [ -z "$slug" ] && continue
-            b64=$(base64 -w0 "build/img/$file")
-            payload=$(jq -n \
-              --arg slug "$slug" \
-              --arg b64 "$b64" \
-              --arg alt "$alt" \
-              --arg ct "$ctype" \
-              '{slug:$slug, dataBase64:$b64, alt:$alt, contentType:$ct}')
-            resp=$(curl -sS -m 120 -X POST "$SITE/api/v1/images" \
+            b64=$(base64 -w0 "$path")
+            payload=$(jq -n --arg s "$slug" --arg b "$b64" --arg a "$alt" --arg c "$ctype" \
+              '{slug:$s, dataBase64:$b, alt:$a, contentType:$c}')
+            resp=$(curl -sS -m 180 -X POST "$SITE/api/v1/images" \
               -H "Authorization: Bearer $AGENT_API_KEY" \
-              -H 'Content-Type: application/json' \
-              --data "$payload")
-            ok=$(printf '%s' "$resp" | jq -r '.ok // false')
-            if [ "$ok" != "true" ]; then
+              -H 'Content-Type: application/json' --data "$payload")
+            if [ "$(printf '%s' "$resp" | jq -r '.ok // false')" != "true" ]; then
               echo "::error::upload failed for $slug: $resp"
               exit 1
             fi
@@ -90,15 +74,15 @@ jobs:
             key=$(printf '%s' "$resp" | jq -r '.image.key')
             echo "  $slug -> $key"
             jq --arg s "$slug" --arg u "$url" --arg k "$key" --arg a "$alt" \
-              '. + [{slug:$s, imageUrl:$u, key:$k, imageAlt:$a}]' \
-              build/uploaded.json > build/tmp.json && mv build/tmp.json build/uploaded.json
-          done < <(jq -r '.[] | [.slug, .file, .alt, .contentType] | @tsv' content/langchain/images.json)
+              '. + [{slug:$s, imageUrl:$u, key:$k, imageAlt:$a}]' build_uploaded.json \
+              > tmp.json && mv tmp.json build_uploaded.json
+          done < <(jq -r '.images[] | [.slug, .path, .alt, .contentType] | @tsv' content/langchain/images.json)
           echo "--- uploaded ---"
-          jq -r '.[] | "\(.slug)\t\(.imageUrl)"' build/uploaded.json
+          jq -r '.[] | "\(.slug)\t\(.imageUrl)"' build_uploaded.json
 
       - name: Publish artifact
         if: ${{ !inputs.dry_run }}
         uses: actions/upload-artifact@v4
         with:
           name: series-image-urls
-          path: build/uploaded.json
+          path: build_uploaded.json
