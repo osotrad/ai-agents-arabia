@@ -1,7 +1,8 @@
 name: Check robots header
 
-# Read-only: confirms X-Robots-Tag on the workers.dev fallback host, and its
-# absence on the apex. Needed because *.workers.dev is TLS-reset locally.
+# Read-only: confirms X-Robots-Tag on the workers.dev fallback and its absence
+# on the apex. Needed because *.workers.dev is TLS-reset from this machine, and
+# the apex needs repeated attempts to distinguish a flaky edge from a real fault.
 
 on:
   workflow_dispatch:
@@ -11,12 +12,19 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - run: |
           set -uo pipefail
           for h in ai-agents-arabia.osotrad101.workers.dev wokala.vip; do
-            hdr=$(curl -sS -m 40 -o /dev/null -D - "https://$h/news" 2>/dev/null | grep -i '^x-robots-tag' | tr -d '\r')
-            code=$(curl -sS -m 40 -o /dev/null -w '%{http_code}' "https://$h/news" 2>/dev/null || echo 000)
-            printf "  %-46s HTTP %-4s %s\n" "$h" "$code" "${hdr:-<none>}"
+            echo "--- $h"
+            for attempt in 1 2 3; do
+              code=$(curl -sS -m 25 -o /dev/null -w '%{http_code}' "https://$h/news" 2>/dev/null || echo 000)
+              hdr=$(curl -sS -m 25 -o /dev/null -D - "https://$h/news" 2>/dev/null \
+                    | grep -i '^x-robots-tag' | tr -d '\r' || true)
+              printf "  attempt %s  HTTP %-4s %s\n" "$attempt" "$code" "${hdr:-<none>}"
+              [ "$code" = "200" ] && break
+              sleep 5
+            done
           done
+          exit 0
