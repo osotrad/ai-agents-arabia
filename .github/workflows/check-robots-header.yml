@@ -1,0 +1,22 @@
+name: Check robots header
+
+# Read-only: confirms X-Robots-Tag on the workers.dev fallback host, and its
+# absence on the apex. Needed because *.workers.dev is TLS-reset locally.
+
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          set -uo pipefail
+          for h in ai-agents-arabia.osotrad101.workers.dev wokala.vip; do
+            hdr=$(curl -sS -m 40 -o /dev/null -D - "https://$h/news" 2>/dev/null | grep -i '^x-robots-tag' | tr -d '\r')
+            code=$(curl -sS -m 40 -o /dev/null -w '%{http_code}' "https://$h/news" 2>/dev/null || echo 000)
+            printf "  %-46s HTTP %-4s %s\n" "$h" "$code" "${hdr:-<none>}"
+          done
