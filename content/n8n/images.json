@@ -1,0 +1,80 @@
+{
+ "_note": {
+  "license": "Original diagrams, drawn by us. n8n is Sustainable-Use-Licensed, not MIT, so its UI screenshots, logo and colours are not reused. See content/n8n/README.md.",
+  "rasterised": "SVG rendered to PNG with headless Chrome because the upload API rejects image/svg+xml. Chrome is also the site's renderer, so the raster matches what a reader sees."
+ },
+ "images": [
+  {
+   "slug": "n8n-what-is-n8n-and-when-you-need-it",
+   "file": "d1.png",
+   "path": "content/n8n/png/d1.png",
+   "sha256": "5c21d080d12a0bd4431dfad03e480403f20433383b012107f49d90d718fdca2e",
+   "bytes": 27332,
+   "contentType": "image/png",
+   "alt": "مخطط يسار إلى يمين: مُحفِّز دوري يقود طلباً عبر الويب، ثم شرط يتفرّع إلى مسارين — صحيحاً يُرسل إشعاراً عبر Slack، وخطأً يؤرشف في Airtable — وينتهي المساران عند نقطة النهاية. مخطط يوضّح أن سير العمل واحد له مساران محتملان."
+  },
+  {
+   "slug": "n8n-first-workflow-no-code",
+   "file": "d2.png",
+   "path": "content/n8n/png/d2.png",
+   "sha256": "54db643ae1609d685ed332a36c77f01a588cb9bb12889ff7125d60e9e76eda89",
+   "bytes": 34792,
+   "contentType": "image/png",
+   "alt": "مخطط من مستويين: المستوى الأول يوضّح العناصر الأربعة — مُحفِّز وعقدتان وعقدة ثالثة — مع أسئلة تقابل كل جزء. المستوى الثاني مثال عملي: رسالة واردة، تحليل الحقول، ثم شرط يتفرّع إلى إشعار أو أرشفة. سهم يحمل رمز عنصر البيانات."
+  },
+  {
+   "slug": "n8n-three-agents-explained",
+   "file": "d3.png",
+   "path": "content/n8n/png/d3.png",
+   "sha256": "c1902c174ecfd02420acf9142e3e4905e8a36fa48a8812aa89f03883870e3424",
+   "bytes": 45094,
+   "contentType": "image/png",
+   "alt": "مخطط بثلاثة مسارات أفقية متجاورة، كل مسار داخل إطار متقطع بلون مختلف. المسار الأول: مُحفِّز يقود عقدة وكيل تقود الأدوات — هذا الوكيل يعيش داخل سير العمل. المسار الثاني: نموذج وتعليمات وقنوات — وكيل كمنتج مستقل في المشروع. المسار الثالث: وصفك يقود سير عمل جاهزاً لا يُنشر إلا بعد مراجعتك."
+  },
+  {
+   "slug": "n8n-expressions-and-data",
+   "file": "d4.png",
+   "path": "content/n8n/png/d4.png",
+   "sha256": "1bea9a3b22d696e74f344cd612ec84440b0f961b833a0ae1f10f659cfe6560c9",
+   "bytes": 27930,
+   "contentType": "image/png",
+   "alt": "مخطط يُظهر طلباً واحداً يدخل عقدة تفريع العناصر فينقسم إلى ثلاثة عناصر متوازية، كل عنصر في مستطيل مستقل. تلتقي بعد ذلك عند عقدة واحدة تقرأ الحقل بتعبير ‎{{ $json.amount }}‎. الرمز ‎{ }‎ على السهم يوضّح أن البيانات تنتقل كعناصر."
+  },
+  {
+   "slug": "n8n-flow-logic-errors-and-retries",
+   "file": "d5.png",
+   "path": "content/n8n/png/d5.png",
+   "sha256": "469cb472bb7fbaf391d029dfe913a63705b5fddd434bfb379c8a7518967e5131",
+   "bytes": 38691,
+   "contentType": "image/png",
+   "alt": "مخطط يعرض المسار الرئيسي من المُحفِّز إلى استدعاء الواجهة، ثم—when يفشل— ينتقلإلى شكل سداسي متقطّع بالبرتقالي يمثّل الخطأ، ثم عقدة انتظار، ثم يعود السهم إلى عقدة الفشل ليُعيد المحاولة. يتفرّع أيضاً مسار إلى سير عمل معالجة الخطأ ينبّهك."
+  },
+  {
+   "slug": "n8n-self-hosting-and-security",
+   "file": "d6.png",
+   "path": "content/n8n/png/d6.png",
+   "sha256": "b601c20d9e828f9c64b7c9acf64533cb71993fdd218d8d881045eaaba2742661",
+   "bytes": 34426,
+   "contentType": "image/png",
+   "alt": "مخطط معماري: النسخة الرئيسية تولّد التنفيذ وتمرّره إلى وسيط Redis، ثم يسحبه عاملان متوازيان. في الأسفل مستطيل برتقالي يمثل حدّ التشفير، وداخله ثلاثة مخازن: قاعدة البيانات، ومتجه بيانات الاعتماد، وتخزين البيانات الثنائية. يجب أن يتشارك الجميع مفتاح التشفير."
+  },
+  {
+   "slug": "n8n-licensing-and-editions-honestly",
+   "file": "d7.png",
+   "path": "content/n8n/png/d7.png",
+   "sha256": "8ee038a8c19bc0cb18472d12de8e0883684d3dc7996736a2317b3af26d4d4938",
+   "bytes": 37277,
+   "contentType": "image/png",
+   "alt": "جدول من أربعة أعمدة يمثّل إصدارات n8n: المجتمع، المجتمع المسجَّل، الأعمال، المؤسسات. تسعة صفوف للميزات، وكل خلية إما علامة صح خضراء متاحة أو علامة خطأ حمراء مقفلة. الصف الأخير يميّز أن وضع الطابور متاح في المجتمع بينما النسخ المتعدد مقصور على المؤسسات."
+  },
+  {
+   "slug": "n8n-production-project-end-to-end",
+   "file": "d8.png",
+   "path": "content/n8n/png/d8.png",
+   "sha256": "3ae788d982043bfd374ec95421d44934f72b2df14be06b4cd0453a448f868544",
+   "bytes": 37098,
+   "contentType": "image/png",
+   "alt": "مخطط يعرض البنية الكاملة: طلب خارجي، ثم وكيل، ثم أدوات، ثم بوابة موافقة بشرية. عند الموافقة ينفذ الإجراء ثم يُسجَّل، وعند الرفض يتوقف المسار. مخرج آخر من الأدوات يذهب إلى مسار معالجة الخطأ الذي ينبّهك. الرموز ‎{ }‎ على السهم تبيّن تدفق البيانات."
+  }
+ ]
+}
