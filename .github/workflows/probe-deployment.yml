@@ -1,0 +1,91 @@
+name: Probe deployment
+
+# Read-only health probe for any deployment, Cloudflare or Vercel.
+#
+# Reports the thing that actually distinguishes "empty site" from "broken
+# database": /api/v1/health returns config.issues (a variable is malformed or
+# missing) and schema.missing (migrations never ran). Content routes swallow
+# DB errors and render an empty state, so the homepage looks merely quiet
+# rather than broken — this probe looks behind that.
+
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Base URL, scheme included"
+        default: "https://ai-agents-arabia.osotrad101.workers.dev"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Status of key routes
+        env:
+          BASE: ${{ inputs.base }}
+        run: |
+          set -uo pipefail
+          for p in / /news /topics /api/v1/health /api/mcp; do
+            code=$(curl -sS -m 30 -o /dev/null -w '%{http_code}' "$BASE$p" 2>/dev/null || echo 000)
+            printf "  %-22s HTTP %s\n" "$p" "$code"
+          done
+
+      - name: Env and schema report
+        env:
+          BASE: ${{ inputs.base }}
+        run: |
+          set -uo pipefail
+          curl -sS -m 30 "$BASE/api/v1/health" -o health.json 2>/dev/null || true
+          echo "--- /api/v1/health"
+          python3 - <<'PY'
+          import json
+          try:
+              h = json.load(open("health.json"))
+          except Exception as e:
+              print(f"  could not parse health response: {e}")
+              raise SystemExit(0)
+
+          issues = (h.get("config") or {}).get("issues") or []
+          schema = h.get("schema") or {}
+          missing = schema.get("missing") or []
+          print(f"  config.issues : {issues if issues else 'none'}")
+          print(f"  schema.missing: {missing if missing else 'none'}")
+          for k in ("articles", "published", "pendingReview", "glossary", "corrections"):
+              if k in h:
+                  print(f"  {k:<13}: {h[k]}")
+          print()
+          if issues:
+              print("  VERDICT: a variable is missing or malformed. The database")
+              print("           is probably fine; fix the env var named above.")
+          elif missing:
+              print("  VERDICT: migrations have not run on this database.")
+          else:
+              print("  VERDICT: env and schema look healthy. If pages are still")
+              print("           empty, the deployment is reading a different database")
+              print("           than expected, or the query is returning nothing.")
+          PY
+
+      - name: Does the content API return rows?
+        env:
+          BASE: ${{ inputs.base }}
+        run: |
+          set -uo pipefail
+          curl -sS -m 30 "$BASE/api/v1/context" -o ctx.json 2>/dev/null || true
+          python3 - <<'PY'
+          import json
+          try:
+              c = json.load(open("ctx.json"))
+          except Exception as e:
+              print(f"  /api/v1/context unparseable: {e}")
+              raise SystemExit(0)
+          arts = (c.get("counts") or {}).get("articles")
+          recents = c.get("recentTitles") or c.get("recent") or []
+          print(f"  counts.articles : {arts}")
+          print(f"  recent titles   : {len(recents)}")
+          for t in recents[:5]:
+              print(f"    - {t}")
+          PY
+          exit 0
