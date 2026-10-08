@@ -3,14 +3,21 @@ import { NextResponse, type NextRequest } from "next/server";
 /**
  * Host-conditional indexation.
  *
- * The Worker answers on two hosts: the apex (wokala.vip) and the
- * *.workers.dev fallback. Both serve identical content, so a crawler sees the
- * same site twice on two domains and splits signals between them.
+ * Three hosts currently serve or will serve identical content:
+ *
+ *   - the apex, wokala.vip          → indexable, the canonical one
+ *   - *.workers.dev                 → the Worker's fallback, noindex
+ *   - *.vercel.app (and *.vercel.sh)→ the staging deployment, noindex
+ *
+ * Any two of those visible at once splits a crawler's signals across domains,
+ * so everything except the apex is marked noindex here and the rule is flipped
+ * at cutover rather than forgotten.
  *
  * Canonical tags already point every page at the apex — CANONICAL_URL is
  * wokala.vip — which is the correct consolidation signal on its own. This
- * middleware adds an explicit `noindex` on the fallback host so it does not
- * compete for the apex at all.
+ * adds an explicit `noindex` on every non-apex host so none of them competes
+ * for it. At cutover the apex moves to Vercel, and this file is reduced to
+ * excluding only *.workers.dev.
  *
  * Why a header and not robots.txt: `Disallow` is not `noindex`. A crawler
  * cannot fetch a page it is told to skip, so it never sees the noindex and may
@@ -27,10 +34,15 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 export function proxy(req: NextRequest) {
   const host = (req.headers.get("host") ?? "").split(":")[0];
-  const isFallbackHost =
-    host.endsWith(".workers.dev") || host === "workers.dev";
+  const isApex = host === "wokala.vip" || host === "www.wokala.vip";
+  if (isApex) return NextResponse.next();
 
-  if (!isFallbackHost) return NextResponse.next();
+  const isFallback =
+    host.endsWith(".workers.dev") ||
+    host.endsWith(".vercel.app") ||
+    host.endsWith(".vercel.sh");
+
+  if (!isFallback) return NextResponse.next();
 
   const res = NextResponse.next();
   res.headers.set("X-Robots-Tag", "noindex");
