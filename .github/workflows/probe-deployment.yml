@@ -52,14 +52,28 @@ jobs:
               print("  missing DATABASE_URL, because auth runs first.")
               raise SystemExit(0)
 
+          # Print the raw body first. A previous version of this probe read
+          # absent keys as "no issues", so an error response looked like a
+          # clean bill of health. Never parse-then-report without the original.
+          raw = open("health.json", encoding="utf-8").read()
+          print("  --- raw /api/v1/health (first 900 chars)")
+          print("  " + raw[:900].replace("\n", " "))
+          print()
+
+          if "articles" not in h:
+              print("  NOTE: the response has no 'articles' key, so it is NOT a")
+              print("        health object. Treating config/schema as clean here")
+              print("        would be a false all-clear — see the raw body above.")
           issues = (h.get("config") or {}).get("issues") or []
           schema = h.get("schema") or {}
           missing = schema.get("missing") or []
           print(f"  config.issues : {issues if issues else 'none'}")
+          print(f"  schema.ok     : {schema.get('ok', '<absent>')}")
           print(f"  schema.missing: {missing if missing else 'none'}")
-          for k in ("articles", "published", "pendingReview", "glossary", "corrections"):
-              if k in h:
-                  print(f"  {k:<13}: {h[k]}")
+          if "articles" in h:
+              print(f"  articles      : {h['articles']}")
+          else:
+              print("  articles      : <absent — not a health response>")
           print()
           if issues:
               print("  VERDICT: a variable is missing or malformed. The database")
@@ -86,9 +100,11 @@ jobs:
           except Exception as e:
               print(f"  /api/v1/context unparseable: {e}")
               raise SystemExit(0)
-          arts = (c.get("counts") or {}).get("articles")
+          raw = open("ctx.json", encoding="utf-8").read()
+          print("  --- raw /api/v1/context (first 400 chars)")
+          print("  " + raw[:400].replace("\n", " "))
+          print()
           recents = c.get("recentTitles") or c.get("recent") or []
-          print(f"  counts.articles : {arts}")
           print(f"  recent titles   : {len(recents)}")
           for t in recents[:5]:
               print(f"    - {t}")
