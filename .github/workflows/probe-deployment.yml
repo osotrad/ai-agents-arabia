@@ -30,15 +30,16 @@ jobs:
           set -uo pipefail
           for p in / /news /topics /api/v1/health /api/mcp; do
             code=$(curl -sS -m 30 -o /dev/null -w '%{http_code}' "$BASE$p" 2>/dev/null || echo 000)
-            printf "  %-22s HTTP %s\n" "$p" "$code"
+            printf "  %-22s HTTP %s (401 expected on the two API routes)\n" "$p" "$code"
           done
 
       - name: Env and schema report
         env:
           BASE: ${{ inputs.base }}
+          AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
         run: |
           set -uo pipefail
-          curl -sS -m 30 "$BASE/api/v1/health" -o health.json 2>/dev/null || true
+          curl -sS -m 30 "$BASE/api/v1/health"             -H "Authorization: Bearer $AGENT_API_KEY"             -o health.json 2>/dev/null || true
           echo "--- /api/v1/health"
           python3 - <<'PY'
           import json
@@ -46,6 +47,9 @@ jobs:
               h = json.load(open("health.json"))
           except Exception as e:
               print(f"  could not parse health response: {e}")
+              print("  A 401 here means the AGENT_API_KEY does not match this")
+              print("  deployment — a wrong key is indistinguishable from a")
+              print("  missing DATABASE_URL, because auth runs first.")
               raise SystemExit(0)
 
           issues = (h.get("config") or {}).get("issues") or []
@@ -71,9 +75,10 @@ jobs:
       - name: Does the content API return rows?
         env:
           BASE: ${{ inputs.base }}
+          AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
         run: |
           set -uo pipefail
-          curl -sS -m 30 "$BASE/api/v1/context" -o ctx.json 2>/dev/null || true
+          curl -sS -m 30 "$BASE/api/v1/context"             -H "Authorization: Bearer $AGENT_API_KEY"             -o ctx.json 2>/dev/null || true
           python3 - <<'PY'
           import json
           try:
