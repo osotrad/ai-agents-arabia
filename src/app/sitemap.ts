@@ -18,8 +18,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/about`, changeFrequency: "monthly", priority: 0.4 },
     { url: `${base}/sources`, changeFrequency: "weekly", priority: 0.5 },
     { url: `${base}/contact`, changeFrequency: "monthly", priority: 0.4 },
-    // Series hubs. Kept in sync with TOPICS in app/topics/[topic]/page.tsx;
-    // a series with no published articles still resolves to an empty state.
+    // Series hubs. /topics is the index and lists every series with articles;
+    // the per-series routes are kept in sync with the registry in
+    // app/topics/[topic]/page.tsx.
+    { url: `${base}/topics`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${base}/topics/langchain`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${base}/topics/n8n`, changeFrequency: "weekly", priority: 0.9 },
   ];

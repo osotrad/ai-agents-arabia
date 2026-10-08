@@ -2,7 +2,6 @@ import { db, articles } from "@/db";
 import { and, asc, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import {
   ArticleCard,
   Container,
@@ -26,6 +25,11 @@ const TOPICS: Record<
     eyebrow: "سلسلة",
     title: "لانغ تشين ولانغ غراف",
     lede: "ثمانية مقالات تأخذك من السؤال الأول — ما هو الوكيل؟ — إلى وكيل حقيقي تحفظ حالته، وتطلب موافقة بشرية قبل أي إجراء حسّاس. كل مقال يبني على سابقه، وكل مقال يخبرك بماذا ستبني بعده.",
+  },
+  "open-weight-models": {
+    eyebrow: "سلسلة",
+    title: "النماذج مفتوحة الأوزان",
+    lede: "إصدارات النماذج مفتوحة الأوزان: الأرقام التي تعلنها، وما يُتاح فعلياً من معاملات وتنزيل.",
   },
   n8n: {
     eyebrow: "سلسلة",
@@ -55,8 +59,14 @@ export default async function TopicPage({
   params: Promise<{ topic: string }>;
 }) {
   const { topic } = await params;
-  const t = TOPICS[topic];
-  if (!t) notFound();
+  // Do NOT 404 on an unregistered topic: `articles.topic` is the source of
+  // truth, and a series can hold articles before anyone has written a lede
+  // for it. A dead link costs more than an untitled page.
+  const t = TOPICS[topic] ?? {
+    eyebrow: "سلسلة",
+    title: topic,
+    lede: "",
+  };
 
   let list: ArticleSummary[] = [];
   try {

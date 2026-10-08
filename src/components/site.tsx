@@ -1,8 +1,9 @@
 import Link from "next/link";
 
 const NAV = [
-  // The series is the site's most complete explainer; it leads the nav.
-  { href: "/topics/langchain", label: "السلسلة" },
+  // Points at the index, not one series: hardcoding a flagship breaks as soon
+  // as a second series exists.
+  { href: "/topics", label: "السلاسل" },
   { href: "/news", label: "الأخبار" },
   { href: "/glossary", label: "المصطلحات" },
   { href: "/sources", label: "المصادر" },
