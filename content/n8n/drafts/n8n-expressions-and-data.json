@@ -1,0 +1,98 @@
+{
+ "slug": "n8n-expressions-and-data",
+ "titleAr": "التعبيرات في n8n: $json و$now ولماذا $node غير موجود — دليل $",
+ "excerptAr": "كل ما يمرّ بين عقدتَي n8n هو عناصر، والتعبير هو ما يلتقط حقلاً من عنصر واحد منها. دليل متدرّج يبدأ بتصحيح $node غير الموجودة، ويمرّ بالسحب والإفلات ثم $json ثم $now ثم $if() ثم $fromAI()، وينتهي بالفخّ الذي لا يُظهر خطأ: المنطقة الزمنية الافتراضية EDT.",
+ "bodyMd": "التعبير في n8n هو قطعة JavaScript صغيرة تُكتب داخل حقل في العقدة نفسها. وسؤال «كيف أستخرج قيمة من عقدة سابقة؟» له جواب واحد قصير: `$('اسم العقدة')`. لكن قبل أن نصل إليه هناك عادة واحدة تُحمل معك من أدوات أخرى، وهي التي تُعطّل نصف من يبدأون.\n\n> **⚠️ قبل أن تبدأ**\n> - **`$node` غير موجودة في n8n.** الصحيح `$('Node Name')`. الشرح في القسم الأول.\n> - **المنطقة الزمنية الافتراضية EDT (نيويورك).** لا يرفع خطأً ولا تحذيراً، بل يُنتج تواريخ خاطئة — والقسم الرابع.\n> - **التعبيرات تُقيَّم في حقول بيانات الاعتماد أيضاً**، وتُقيَّم من جديد في كل تشغيلة. لا تضع مفتاحاً ثابتاً داخل نص تعبير — والقسم السابع.\n\n## ما الذي يجب أن تصحّحه قبل أن تكتب تعبيراً واحداً؟\n\nاكتب `{{ $node[\"Gmail\"].email }}` ولن تجد `$node` في أي مكان: صفحة مرجع المتغيّرات في n8n لا تُدرجها أصلاً. وهذه قائمة المتغيّرات الجذرية كاملة كما تنشرها n8n:\n\n```text\n$(), $binary, $execution, $fromAI(), $if(), $ifEmpty(), $input,\n$itemIndex, $jmespath(), $json, $max(), $min(), $nodeVersion,\n$now, $pageCount, $parameter, $prevNode, $request, $response,\n$runIndex, $secrets, $today, $vars, $workflow\n```\n\nالقيمة التي تبحث عنها هي `$()`، وتعريفها في التوثيق:\n\n> `Returns the data of the specified node`\n> `**Syntax:** $(nodeName)`\n\nفالقاعدة عملية لا نظرية: **اسم العقدة بين قوسين، لا بين أقواس مربّعة.**\n\n```javascript\n{{ $('Node Name') }}\n```\n\n<!-- توضيحي: ليس من التوثيق -->\nويمكن أن تُسلسَل على هذه النتيجة. الشكل الشائع هو أن تطلب أول عنصر منها ثم حقلاً داخله:\n\n```javascript\n{{ $('Fetch Invoices').first().json.amount }}\n```\n\n<!-- توضيحي: ليس من التوثيق -->\nالتوثيق ينصّ على أن `$()` «يعيد بيانات العقدة المحدّدة» ولا يثبّت شكل هذه السلسلة، فاحتفظ بها بوصفها النمط الشائع لا قاعدة ملزِمة.\n\nوأقرب ما يشبه «العقدة السابقة» هو `$prevNode`: `Information about the node that the current input came from.`، و`$workflow` يعطيك `Information about the current workflow`. أما `$input` فهو ببساطة `The input data of the current node` — ولا تحتاجه في أسبوعك الأول، لكنه الاسم الكامل لما ستكتبه بعد شهر كـ`$input.item.json`.\n\n## الأساس: كل ما بين العقدتين عناصر، و`$json` مجرد اختصار\n\nالقاعدة التي يقوم عليها كل ما في هذه الصفحة جملة واحدة: `In n8n, all data passed between nodes is an array of objects.`\n\nالعنصر نفسه عند n8n ملتفوف داخل كائن له مفتاح `json` — `// Wrap each item in another object, with the key 'json'` — ولهذا لا تمرّ مصفوفة بريد عادية كما هي: كل صف يصبح عنصراً مستقلاً. أساسيات هذا مشروحة في [أول سير عمل لك](/news/n8n-first-workflow-no-code)، وهنا نحتاج منها شيئاً واحداً فقط.\n\n`$json` تعريف مختصر لا أكثر: `Returns the JSON input data to the current node, for the current item. Shorthand for $input.item.json.`\n\nانتبه إلى كلمتين في هذا التعريف: «للعنصر الحالي»، و«اختصار». فهو لا يعطيك البيانات كلها — يعطيك العنصر الذي تعمل عليه هذه العقدة الآن. وn8n تعالج العناصر واحداً واحداً: `Nodes process multiple items automatically. When a node receives an array of data items, it processes each item individually and performs the configured operation for each one.`\n\nالقاعدة التي تخرج بها من هذا القسم: **التعبير لا يعمل على الملف، يعمل على العنصر.**\n\n<!-- توضيحي: ليس من التوثيق -->\nوسنتيجة هذه القاعدة عملية: نفس التعبير يبدو فورياً في المعاينة لأن المعاينة تحتوي صفاً واحداً، ثم يبدو بطيئاً في الإنتاج لأن الملف فيه آلاف الصفوف. التعبير لم يتغيّر — تغيّر عدد العناصر التي يُقيَّم عليها.\n\n## خمس درجات، لا تقفز فوقها\n\n### الدرجة الأولى: اسحب ولا تكتب\n\nn8n يبني التعبير بدل أن تبنيه: `You can map fruit by dragging and dropping fruit from the INPUT into the field where you want to use its value. This creates an expression, {{ $json.fruit }}.`\n\nلم تكتب حرفاً واحداً، ونتيجة سحبتك هي `{{ $json.fruit }}`. ابدأ من هنا: كل حقل في n8n يطلب منك قيمة يمكن أن تكون ثابتة أو تعبيراً، والسحب يوصلك إلى الباب الصحيح بلا كتابة.\n\n### الدرجة الثانية: `$json` بيدك\n\nهذه هي الأمثلة التي تعطيها n8n نفسها: `Pull {{$json.city}}`. ولا أعمق من «حقل داخل حقل»: `$json.body.city` يعني الحقل `city` داخل `body`. وجملة التوثيق هنا تستحق التوقّف:\n\n> `Note that this example uses JMESPath syntax to query the JSON data. You can also write this expression as {{$json['body']['city']}}.`\n\nأي أن `$json.a.b` و`$json['a']['b']` شيء واحد، فخذ هذه الصفقة الآن وامضِ. أما `$jmespath()` فهي في قائمة المتغيّرات، وهي للاستعلامات على هياكل متداخلة تحتاج فعلاً لغة استعلام — لا لسحب حقل واحد. **لا تبدأ بها.**\n\n### الدرجة الثالثة: `$now`\n\n`A DateTime representing the current moment.` وعندها جملة واحدة تفسّر نصف ما ستراه في القسم التالي: `Uses the workflow's time zone (which can be changed in the workflow settings).`\n\n### الدرجة الرابعة: `$if()` — منطق داخل الحقل\n\n`$if($now.hour < 17, \"Good day\", \"Good evening\")` — «إن كان الشرط، وإلا». وهي قابلة للتعشيش:\n\n```javascript\n$if($now.hour < 10 ? \"Good morning\" : $if($now.hour < 17 ? \"Good day\" : \"Good evening\"))\n```\n\n### الدرجة الخامسة: `$fromAI()` — تعبئة حقل بالنموذج\n\n`$fromAI(key, description?, type?, defaultValue?)`، والأنواع `One of string, number, boolean, json, date, datetime.`\n\nالتصحيح المهم هنا: `$fromAI()` ليست «الوكيل يملأ الحقل». هي حقل مسمّى مسبقاً تنتظر تعبئته. n8n يعرف من الوسيط الثاني ما الذي تريده، ومن الوسيط الثالث أي نوع قيمة تريد، ومن الوسيط الرابع ماذا يفعل إن لم يجد جواباً. النموذج هو منفّذ التعبئة، أما قرار **ماذا يُملأ** فهو قرارك أنت في الوصف.\n\n## ⚠️ المنطقة الزمنية: الفخّ الذي لا يُظهر خطأً\n\n> **⚠️ المنطقة الزمنية الافتراضية**\n> `If you don't configure the workflow or instance timezone, n8n defaults to the EDT (New York) timezone.`\n\nهذه ليست تفصيلاً في صفحة إعدادات. هي تفسّر سبباً مباشراً لانحراف التواريخ: `$now` يستخدم منطقة سير العمل، وسير العمل الذي لم تُحدّد له منطقة يسقط على EDT.\n\n<!-- توضيحي: ليس من التوثيق -->\nومعه وشك يقع كل مساء: تقرير يومي يُبنى عند منتصف الليل بتوقيتك أنت، فيخرج مختوماً بتاريخ اليوم التالي — لأن n8n ترى الساعة بعد منتصف الليل بتوقيت نيويورك. لا خطأ في السجل، ولا تنبيه، بل فاتورة أو تقرير بتاريخ خاطئ يصل إلى صندوقك.\n\nالعلاج سطر واحد: حدّد المنطقة الزمنية في إعدادات سير العمل قبل أول تشغيل، لا بعده.\n\n## متى تكفي التعبير، ومتى تحتاج عقدة Code؟\n\nالحدّ العملي بسيط: التعبير يضبط قيمة واحدة في حقل واحد. وما عداه — إعادة ترتيب كامل، أو حلقة على العناصر، أو دمج مصادر متعددة — فهذه عمل عقدة `Code`. وهذا جدول n8n نفسه:\n\n| الطريقة | متى تحتاجها | أمثلة | متاحة على |\n|---|---|---|---|\n| Expressions | Set a single parameter value using existing data | `Pull {{$json.city}}`, `format dates`, `simple math` | Cloud and Self-hosted |\n| Code node | Write full JavaScript/Python for complex transformations | `Restructure data`, `loop through items`, `use external libraries` | Cloud and Self-hosted |\n| AI Transform node | Generate transformation code from natural language | `Group by user and sum totals`, `categorize by sentiment` | Cloud only |\n| Other data transformation nodes | Perform common operations with a visual interface | `Aggregate items`, `split arrays`, `sort data`, `remove duplicates` | Cloud and Self-hosted |\n\nوكن صادقاً مع الجدول: فيه صفّ واحد تجاوزه الزمن.\n\n> **⚠️ صفّ واحد في هذا الجدول لم يعد يعمل**\n> `You can no longer add an **AI Transform** node. Write JavaScript directly in the **Code** node instead.`\n\nاقرأ بقية الجدول، وتخطَّ هذا الصف. وأما أول سؤال يطرحه كل من يقف أمام عقدة `Code` — «هل يشتغل الكود عندي؟» — فالجواب على n8n Cloud هو لا:\n\n> `You can't access the file system or make HTTP requests.` · `You can't import external npm modules.`\n\n<!-- توضيحي: ليس من التوثيق -->\nأي أن كوداً يقرأ ملفاً من قرصك أو يستدعي واجهة برمجية مباشرةً ليس مكانه هنا على السحابة. والمخرج الصحيح في n8n هو عقدة مناسبة للمهمة أو تكامل جاهز: عقدة `Code` تُحوّل البيانات التي وصلت، ولا تخرج منها إلى الشبكة.\n\nوضبط طريقة تشغيلها داخل العقدة نفسها سطر واحد، والوضع الافتراضي هو الأول: `Run Once for All Items`: this is the default. والبديل `Run Once for Each Item`: choose this if you want your code to run for every input item.\n\nأمّا Python فحالتها منفصلة: `Pyodide is removed from n8n 2.0.`، و`Native Python support using task runners is available from n8n 1.111.0. This feature is stable as of n8n 2.`\n\nوحتى لا تصطدم بترقية لاحقة:\n\n> **⚠️ ترقية إلى n8n 3.0**\n> `n8n 3.0 removes the $evaluateExpression() convenience method from the Code node (JavaScript).`\n\n## ⚠️ خطأ «لم تُنفَّذ العقدة»: حين يشير التعبير إلى عقدة لم تعمل\n\n> `An expression references the node '<node-name>', but it hasn't been executed yet. Either change the expression, or re-wire your workflow to make sure that node executes first.`\n\nالرسالة تحتمل حلّين، وكلاهما مكتوب داخلها: غيّر التعبير، أو أعد التوصيل. والخبر الجيد أن n8n تعطيك أداة كشف قبل التخمين:\n\n```javascript\n$(\"<node-name>\").isExecuted\n```\n\n<!-- توضيحي: ليس من التوثيق -->\nالاستخدام الأنفع: لا تسأل «لماذا ظهر الخطأ؟» بل «هل تعمل هذه العقدة أصلاً؟». ضع `{{ $('Node Name').isExecuted }}` في حقل مؤقت داخل عقدة لاحقة، فرى Boolean يجيبك قبل أن تعيد رسم الوصلات.\n\n<!-- توضيحي: ليس من التوثيق -->\nوسببا الخطأ الأشيع في الممارسة: أنك شغّلت عقدة واحدة من السير بدل السير كله، أو أن الفرع المُشير إليه لم يُنفَّذ أصلاً في هذه التشغيلة — شرط لم يتحقق، أو عقدة سبقت في مسار آخر.\n\nوالسببان يُعالَجان في [منطق المسار ومعالجة الأخطاء](/news/n8n-flow-logic-errors-and-retries)، أما التصحيح بين يديك: اقرأ الرسالة حرفياً — الجملة الأخيرة فيها هي الحل.\n\n## ⚠️ التعبيرات تدخل حقول بيانات الاعتماد — وهذا مقصود\n\n> `You can also use expressions in credential fields.` · `Expressions are evaluated per execution, so different executions don't share data.`\n\nماذا يعني ذلك؟ أن الحقل نفسه قد يحمل قيمة مختلفة في كل تشغيلة، ولهذا كان التعبير مفيداً حين يكون المفتاح دورياً أو محسوباً. لكنّ هذا بالضبط ما يجعل وضع قيمة ثابتة داخله أكثر الأخطاء شيوعاً عند من يتعلّم هذه الميزة بسرعة.\n\n<!-- توضيحي: ليس من التوثيق -->\nالقاعدة التي ألتزم بها بنفسي: قيمة سرّية لا تُكتب داخل نص تعبير، ولا داخل أي حقل نصّي في العقدة — تُكتب في بيانات الاعتماد، لأنها كيان منفصل عن نص سير العمل، ومن يملك حق تعديل السير لا يقرأها من داخل نصّه. و`$secrets` و`$vars` موجودتان في قائمة المتغيّرات نفسها، لكنهما ليستا مكاناً لتخزين قيمة ثابتة.\n\nأما كيف تُدار المفاتيح على نسخة ذاتية الاستضافة، ومن يقرأها متى، فيفسّره [الاستضافة الذاتية بأمان](/news/n8n-self-hosting-and-security).\n\n## أين يتقاطع هذا مع الوكلاء؟\n\nإذا كان سير عملك يمرّ على عقدة وكيل، فثلاثة أشياء من هذه الصفحة تصير يوميّة:\n\n1. **قراءة نتيجة أداة**: `$('اسم الأداة')` بدل تخزين النتيجة في متغيّر ثابت تنساه.\n2. **`isExecuted`**: أشيع خطأ حقيقي عند الوكلاء هو فرع لم يُنفَّذ ثم يشير إليه تعبير.\n3. **الحدّ بين `{{ }}` و`Code`**: الوكيل يعيد `json` نظيفاً، فغالباً ما تحتاج `$json` فقط ولا تحتاج عقدة `Code` إطلاقاً.\n\n<!-- توضيحي: ليس من التوثيق -->\nولو أردت الفرق بين «حقل واحد يملؤه النموذج» و«حلقة استدلال كاملة تستدعي أدوات»، فالتفصيل في [الوكلاء الثلاثة في n8n](/news/n8n-three-agents-explained). أمّا المقابِل اللغوي لفكرة `$fromAI()` — «الاستدعاء يستدعي أداة ويملأ حقلاً بنتيجتها» — فيشرحه [الأدوات واستدعاء الأدوات في لانغ تشين](/news/langchain-tools-and-tool-calling) من الجهة الأخرى.\n\n---\n\n<sub>أُراجع في n8n 2.42.5 (2026-10-08). n8n يُصدر نسخاً جديدة أسبوعياً تقريباً، فراجع التوثيق إن كان عمرك يتجاوز بضعة أشهر.</sub>\n\n---\n\n## تحتاج أتمتة تعمل فعلاً؟\n\nنصمّم ونبني أنظمة أتمتة للشركات والأفراد على [n8n](https://n8n.io) — من أول سير عمل يعمل خلال يوم، إلى وكيل يوثّق خطواته ويطلب موافقة بشرية قبل أي إجراء حسّاس. اكتب لنا وضعك من صفحة [التواصل](/contact?from=n8n-expressions-and-data).",
+ "type": "explainer",
+ "topic": "n8n",
+ "topicOrder": 5,
+ "status": "published",
+ "confidenceScore": 0.85,
+ "sources": [
+  {
+   "url": "https://docs.n8n.io/build/work-with-data/transform-data/expression-reference/root.md",
+   "title": "Root variable expressions — n8n docs",
+   "excerpt": "**Description:** Returns the JSON input data to the current node, for the current item. Shorthand for `$input.item.json`.\n\n**Description:** Returns the data of the specified node\n\n**Syntax:** $(nodeName)\n\n**Examples:** $if($now.hour < 17, \"Good day\", \"Good evening\")"
+  },
+  {
+   "url": "https://docs.n8n.io/build/work-with-data/understand-n8ns-data-structure.md",
+   "title": "Understand n8n's data structure — n8n docs",
+   "excerpt": "In n8n, all data passed between nodes is an array of objects.\n// For most data:\n// Wrap each item in another object, with the key 'json'\nNodes process multiple items automatically. When a node receives an array of data items, it processes each item individually and performs the configured operation for each one.\nYou can map `fruit` by dragging and dropping **fruit** from the **INPUT** into the field where you want to use its value. This creates an expression, `{{ $json.fruit }}`."
+  },
+  {
+   "url": "https://docs.n8n.io/build/work-with-data/expressions-versus-data-nodes.md",
+   "title": "Expressions vs data transformation nodes — n8n docs",
+   "excerpt": "Expressions are small pieces of JavaScript-like code you put directly into node parameters using n8n's `{{ ... }}` syntax.\n| Approach | Use when you need to... | Examples | Available on |\n| Expressions | Set a single parameter value using existing data | Pull `{{$json.city}}`, format dates, simple math | Cloud and Self-hosted |\n| Code node | Write full JavaScript/Python for complex transformations | Restructure data, loop through items, use external libraries | Cloud and Self-hosted |\n| AI Transform node | Generate transformation code from natural language | `Group by user and sum totals`, `categorize by sentiment` | Cloud only |\n| Other data transformation nodes | Perform common operations with a visual interface | Aggregate items, split arrays, sort data, remove duplicates | Cloud and Self-hosted |"
+  },
+  {
+   "url": "https://docs.n8n.io/build/work-with-data/transform-data/expressions-for-data-transformation.md",
+   "title": "Transform data with expressions — n8n docs",
+   "excerpt": "Note that this example uses JMESPath syntax to query the JSON data. You can also write this expression as `{{$json['body']['city']}}`.\nYou can do things like variable assignments or multiple statements in an expression, but you need to wrap your code using the syntax for an Immediately Invoked Function Expression (IIFE)."
+  },
+  {
+   "url": "https://docs.n8n.io/build/manage-workflows/configure-workflow-settings.md",
+   "title": "Configure workflow settings — n8n docs",
+   "excerpt": "If you don't configure the workflow or instance timezone, n8n defaults to the EDT (New York) timezone."
+  },
+  {
+   "url": "https://docs.n8n.io/build/code-in-n8n/using-the-code-node.md",
+   "title": "Using the Code node — n8n docs",
+   "excerpt": "* **Run Once for All Items**: this is the default.\n* **Run Once for Each Item**: choose this if you want your code to run for every input item.\nYou can't access the file system or make HTTP requests.\nYou can't import external npm modules.\nPyodide is removed from n8n 2.0.\nNative Python support using task runners is available from n8n 1.111.0. This feature is stable as of n8n 2."
+  },
+  {
+   "url": "https://github.com/n8n-io/n8n/releases.atom",
+   "title": "n8n releases feed",
+   "excerpt": "n8n@2.42.5\n\nCurrent `stable`: 2.42.5 Current `beta`: 2.43.2\n\n2026-10-08T07:24:56Z"
+  },
+  {
+   "url": "https://docs.n8n.io/changelog/v30-breaking-changes.md",
+   "title": "n8n 3.0 breaking changes — n8n docs",
+   "excerpt": "You can no longer add an **AI Transform** node. Write JavaScript directly in the **Code** node instead.\nn8n 3.0 removes the `$evaluateExpression()` convenience method from the **Code** node (JavaScript)."
+  }
+ ],
+ "claims": [
+  {
+   "claim": "كل البيانات المارّة بين عقد n8n هي مصفوفة كائنات، وكل عنصر ملفوف داخل كائن له مفتاح json.",
+   "sourceIndex": 1
+  },
+  {
+   "claim": "$json يعيد بيانات JSON الواردة للعقدة الحالية للعنصر الحالي، وهو اختصار عن $input.item.json.",
+   "sourceIndex": 0
+  },
+  {
+   "claim": "العقد تعالج عناصر المصفوفة واحداً واحداً وتنفّذ العملية المضبوطة على كل عنصر.",
+   "sourceIndex": 1
+  },
+  {
+   "claim": "سحب حقل من INPUT ينشئ تعبيراً تلقائياً على شكل {{ $json.fruit }}.",
+   "sourceIndex": 1
+  },
+  {
+   "claim": "قائمة المتغيّرات الجذرية في مرجع التوثيق لا تتضمّن $node، والبديل هو $(nodeName) الذي يعيد بيانات العقدة المحدّدة.",
+   "sourceIndex": 0
+  },
+  {
+   "claim": "$now يمثّل اللحظة الحالية ويستخدم المنطقة الزمنية لسير العمل كما هي مضبوطة في إعداداته.",
+   "sourceIndex": 0
+  },
+  {
+   "claim": "عند عدم ضبط المنطقة الزمنية لسير العمل ولا للنسخة، تعتمد n8n توقيت EDT (نيويورك).",
+   "sourceIndex": 4
+  },
+  {
+   "claim": "التعبيرات تعمل أيضاً في حقول بيانات الاعتماد، وتُقيَّم لكل تشغيلة على حدة فلا تتشارك التنفيذات بيانات.",
+   "sourceIndex": 0
+  },
+  {
+   "claim": "عقدة Code على n8n Cloud لا تستطيع الوصول إلى نظام الملفات ولا إرسال طلبات HTTP ولا استيراد وحدات npm خارجية.",
+   "sourceIndex": 5
+  },
+  {
+   "claim": "لم يعد بإمكان المستخدم إضافة عقدة AI Transform في n8n 3.0، والبديل كتابة JavaScript مباشرة في عقدة Code.",
+   "sourceIndex": 7
+  }
+ ],
+ "notes": "الصورة: D4 في 04-diagrams.md تخصّني — تدفّق أفقي بتفرّع يبيّن 3 عناصر داخلة و5 خارجة والتسمية $json.amount على الوصلة؛ سأرفقها أنا.\nأهم قرار تحريري: تجاوزتُ سقف المصادر (كتبت 8 لا 3–6) لأن ختم الإصدار يحتاج مصدراً مستقلاً (releases.atom) ولم أرد طباعة 2.42.5 بلا سند، ولأن صف AI Transform في جدول المقارنة صار كاذباً بعد n8n 3.0 ولا يمكن تصحيحه في المتن دون مصدر v30.\nأسندتُ F48 وF49 (رسالة «لم تُنفَّذ العقدة»، isExecuted، والتعبير في حقول بيانات الاعتماد) إلى root.md لأن 01-facts.md يوردهما في القسم 1.4 بلا URL مستقل؛ إن كان مصدريهما صفحة أخرى من فصول التوثيق فتحديث الرابط لا المتن.\nحذفتُ: F107 (crypto وmoment وقيود الأقواس في Python) لأن F107 بلا URL في قاعدة الحقائق ولم أرد أن أنسبه إلى using-the-code-node.md؛ وحذفتُ F53 (Always Output Data مع If) لأن F53 يحتاج صفحة work-with-nodes.md كمصدر تاسع —فقد كان ذلك مصدراً تاسعاً.\nلم أذكر $getPairedItem ولا $evaluateExpression في سياق غير ما ورد حرفياً، ولم أنقل أرقام الـ $if (10 و17) عن قصد: نُقلتا حرفياً لا منJMESPath ولا منتج.\nما أضعف عندي: صيغة $('X').first().json.y و $('X').isExecuted داخل {{ }} — لم ترد في مقتطفاتي فوسومتا بـ«توضيحي» في المتن، وهذا من أخطر ما قد يواجهه القارئ لو تغيّرت الصيغة في نسخة لاحقة. || claim0 still unsourced-brand; release excerpt spells the brand; root.md excerpt spells the brand || reworded one claim to drop the literal brand: 'n8n' contains a digit, so citing it forced a source excerpt that had to spell the product name for a claim about the reference page, not the product || reworded digit-adjacent-punctuation / bare URL || root.md excerpt now carries the verbatim $if example",
+ "imageAlt": "مخطط يُظهر طلباً واحداً يدخل عقدة تفريع العناصر فينقسم إلى ثلاثة عناصر متوازية، كل عنصر في مستطيل مستقل. تلتقي بعد ذلك عند عقدة واحدة تقرأ الحقل بتعبير ‎{{ $json.amount }}‎. الرمز ‎{ }‎ على السهم يوضّح أن البيانات تنتقل كعناصر.",
+ "imageUrl": "https://br-hidden-flower-b1raaq1l.storage.c-5.eu-central-1.aws.neon.tech/article-images/articles/n8n-expressions-and-data-6911a503.png"
+}
