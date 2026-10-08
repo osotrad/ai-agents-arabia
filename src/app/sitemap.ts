@@ -21,6 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Series hubs. Kept in sync with TOPICS in app/topics/[topic]/page.tsx;
     // a series with no published articles still resolves to an empty state.
     { url: `${base}/topics/langchain`, changeFrequency: "weekly", priority: 0.9 },
+    { url: `${base}/topics/n8n`, changeFrequency: "weekly", priority: 0.9 },
   ];
 
   try {
