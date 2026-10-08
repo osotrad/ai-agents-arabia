@@ -60,6 +60,17 @@ export default function RootLayout({
         <SiteHeader />
         <div className="flex-1">{children}</div>
         <SiteFooter />
+        {/*
+          Vercel Web Analytics, script install. Chosen over @vercel/analytics
+          deliberately: that package needs an npm dependency and injects
+          useReportWebVitals, and this same layout is still built for Cloudflare
+          by deploy.yml. This tag is build-target agnostic and costs one line.
+
+          Analytics is a third-party request on every page load, so it goes on
+          `defer` and stays off the critical path. No cookies, no cross-site
+          tracking, no fingerprinting — pageviews and referrers only.
+        */}
+        <script defer src="https://va.vercel-scripts.com/v1/script.js" />
       </body>
     </html>
   );
