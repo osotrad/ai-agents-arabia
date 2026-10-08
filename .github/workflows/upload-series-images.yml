@@ -21,6 +21,10 @@ on:
         description: "Verify bytes against the manifest, upload nothing"
         type: boolean
         default: false
+      series:
+        description: "Series directory under content/ (must hold images.json)"
+        type: string
+        default: langchain
 
 permissions:
   contents: read
@@ -33,6 +37,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Verify bytes against manifest
+        env:
+          SERIES: ${{ inputs.series }}
         run: |
           set -euo pipefail
           n=0
@@ -45,7 +51,7 @@ jobs:
             fi
             echo "  ok $path"
             n=$((n+1))
-          done < <(jq -r '.images[] | [.path, .sha256] | @tsv' content/langchain/images.json)
+          done < <(jq -r '.images[] | [.path, .sha256] | @tsv' "content/$SERIES/images.json")
           echo "  $n diagram(s) verified"
 
       - name: Upload via the site API
@@ -53,6 +59,7 @@ jobs:
         env:
           SITE: ${{ vars.SITE_URL }}
           AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
+          SERIES: ${{ inputs.series }}
         run: |
           set -euo pipefail
           test -n "$SITE" || { echo "::error::SITE_URL unset"; exit 1; }
@@ -80,11 +87,14 @@ jobs:
             jq --arg s "$slug" --arg u "$url" --arg k "$key" --arg a "$alt" \
               '. + [{slug:$s, imageUrl:$u, key:$k, imageAlt:$a}]' build_uploaded.json \
               > tmp.json && mv tmp.json build_uploaded.json
-          done < <(jq -r '.images[] | [.slug, .path, .alt, .contentType] | @tsv' content/langchain/images.json)
+          done < <(jq -r '.images[] | [.slug, .path, .alt, .contentType] | @tsv' "content/$SERIES/images.json")
           echo "--- uploaded ---"
           jq -r '.[] | "\(.slug)\t\(.imageUrl)"' build_uploaded.json
 
       - name: Publish artifact
+        # Artifact storage has hit its quota; the upload itself already
+        # succeeded, so a failure here must not fail the run.
+        continue-on-error: true
         if: ${{ !inputs.dry_run }}
         uses: actions/upload-artifact@v4
         with:
