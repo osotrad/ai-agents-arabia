@@ -25,26 +25,21 @@ jobs:
         run: |
           set -uo pipefail
           printf "  %-46s %8s %8s %8s\n" "path" "ttfb" "total" "size"
+          # One warm-up hit first: every content route is force-dynamic, so the
+          # first request pays connection setup that no repeat visitor sees.
           for p in / /news /topics /topics/n8n /glossary /contact \
                    /news/n8n-three-agents-explained \
                    /news/langchain-langgraph-arabic-guide \
                    /feed.xml /sitemap.xml /llms.txt ; do
-            # three runs, report the median to shed one-off connection noise
-            vals=""
-            for i in 1 2 3; do
-              read -r t ttfb size <<<"$(curl -sS -m 45 -o /dev/null \
-                -w '%{time_total} %{time_starttransfer} %{size_download}' \
+            curl -sS -m 45 -o /dev/null "$BASE$p" 2>/dev/null || true
+            ttfb=""; tot=""; siz=""
+            for i in 1 2 3 4 5; do
+              read -r t s d <<<"$(curl -sS -m 45 -o /dev/null \
+                -w '%{time_starttransfer} %{time_total} %{size_download}' \
                 "$BASE$p" 2>/dev/null || echo "0 0 0")"
-              vals="$vals $ttfb $t $size"
+              ttfb="$ttfb $t"; tot="$tot $s"; siz="$siz $d"
             done
-            echo "$vals" | tr ' ' '\n' | grep -v '^$' | sort -g > /tmp/v
-            mapfile -t m < /tmp/v
-            n=${#m[@]}
-            if [ "$n" -ge 9 ]; then
-              ttfb_med=$(echo "${m[$((n/3))]}")
-              tot_med=$(echo "${m[$((n*2/3))]}")
-              siz_med=$(echo "${m[$((n-1))]}")
-              printf "  %-46s %7ss %7ss %7sB\n" "$p" "$ttfb_med" "$tot_med" "$siz_med"
-            fi
+            med() { echo "$1" | tr ' ' '\n' | grep -v '^$' | sort -g | sed -n '3p'; }
+            printf "  %-44s %8ss %8ss %9sB\n" "$p" "$(med "$ttfb")" "$(med "$tot")" "$(med "$siz")"
           done
           exit 0
