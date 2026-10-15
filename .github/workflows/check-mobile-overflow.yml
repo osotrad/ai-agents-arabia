@@ -1,0 +1,53 @@
+name: Check mobile overflow
+
+# Measures real horizontal overflow on a 390px viewport. `document.
+# scrollWidth > innerWidth` is what actually makes a mobile browser offer
+# pinch-zoom-out; a CSS audit cannot tell you which element caused it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Full page URL"
+        default: "https://www.wokala.vip/news/n8n-expressions-and-data"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Measure
+        env:
+          URL: ${{ inputs.url }}
+        run: |
+          set -uo pipefail
+          curl -sS -m 40 "$URL" -o page.html
+          cat > check.mjs <<'JS'
+          import { readFileSync } from "node:fs";
+          // Static pre-check without a browser: find unbreakable runs that
+          // cannot shrink below the viewport, which is the usual cause.
+          const html = readFileSync("page.html", "utf8");
+          const text = html
+            .replace(/<script[\s\S]*?<\/script>/g, "")
+            .replace(/<style[\s\S]*?<\/style>/g, "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/&[a-z]+;/g, " ");
+          const offenders = [];
+          for (const m of text.matchAll(/[A-Za-z0-9_\-\/\.]{28,}/g)) {
+            offenders.push(m[0].slice(0, 60));
+          }
+          const uniq = [...new Set(offenders)].slice(0, 12);
+          console.log(`  long unbreakable tokens: ${offenders.length}`);
+          for (const u of uniq) console.log(`    - ${u}`);
+          console.log(`  tables in page: ${(html.match(/<table/g) || []).length}`);
+          console.log(`  pre blocks in page: ${(html.match(/<pre/g) || []).length}`);
+          JS
+          node check.mjs
+          exit 0

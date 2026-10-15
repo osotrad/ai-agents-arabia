@@ -1,0 +1,50 @@
+name: Check performance
+
+# Repeatable timing against the live site, from a runner. Every content route
+# is force-dynamic, so these numbers are real database round-trips each hit —
+# there is no cache to hide behind, and a regression here is a real one.
+
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Base URL"
+        default: "https://www.wokala.vip"
+
+permissions:
+  contents: read
+
+jobs:
+  perf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Timing
+        env:
+          BASE: ${{ inputs.base }}
+        run: |
+          set -uo pipefail
+          printf "  %-46s %8s %8s %8s\n" "path" "ttfb" "total" "size"
+          for p in / /news /topics /topics/n8n /glossary /contact \
+                   /news/n8n-three-agents-explained \
+                   /news/langchain-langgraph-arabic-guide \
+                   /feed.xml /sitemap.xml /llms.txt ; do
+            # three runs, report the median to shed one-off connection noise
+            vals=""
+            for i in 1 2 3; do
+              read -r t ttfb size <<<"$(curl -sS -m 45 -o /dev/null \
+                -w '%{time_total} %{time_starttransfer} %{size_download}' \
+                "$BASE$p" 2>/dev/null || echo "0 0 0")"
+              vals="$vals $ttfb $t $size"
+            done
+            echo "$vals" | tr ' ' '\n' | grep -v '^$' | sort -g > /tmp/v
+            mapfile -t m < /tmp/v
+            n=${#m[@]}
+            if [ "$n" -ge 9 ]; then
+              ttfb_med=$(echo "${m[$((n/3))]}")
+              tot_med=$(echo "${m[$((n*2/3))]}")
+              siz_med=$(echo "${m[$((n-1))]}")
+              printf "  %-46s %7ss %7ss %7sB\n" "$p" "$ttfb_med" "$tot_med" "$siz_med"
+            fi
+          done
+          exit 0

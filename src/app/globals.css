@@ -29,11 +29,41 @@
   --font-mono: var(--font-mono), "IBM Plex Mono", monospace;
 }
 
+html {
+  /*
+   * Clip horizontal overflow at the root. Without this, one wide table or one
+   * unbreakable slug widens the whole document, and a mobile browser answers
+   * by letting the user pinch-zoom out to see it. Clipping at html keeps the
+   * viewport fixed; `pre` still scrolls internally because its own
+   * `overflow-x: auto` establishes a scroll container first.
+   *
+   * `overflow-x: clip` rather than `hidden`: hidden on the root silently
+   * makes it a scroll container and breaks `position: sticky` on the header.
+   */
+  overflow-x: clip;
+}
+
 body {
   background: var(--ink);
   color: var(--paper);
   font-family: var(--font-arabic), system-ui, sans-serif;
   line-height: 1.8;
+  /* Belt-and-braces for engines that ignore overflow-x: clip on html. */
+  overflow-x: clip;
+}
+
+/*
+ * iOS Safari zooms the viewport when a form control is focused and its
+ * computed font-size is under 16px — the visitor then has to pinch back out,
+ * which reads as "the page is too big". Tailwind's preflight sets form
+ * controls to `font: inherit`, which is 16px here, but `text-sm` on the header
+ * search overrides that with 14px and reintroduces the zoom. Pin the floor.
+ */
+input,
+select,
+textarea,
+button {
+  font-size: max(1rem, 1em);
 }
 
 /* Latin numerals & code read better in mono; Arabic body in Plex Arabic */
@@ -94,7 +124,41 @@ body {
   line-height: 1.7;
 }
 .prose-ar pre code { background: none; border: 0; padding: 0; }
-.prose-ar table { width: 100%; border-collapse: collapse; margin-bottom: 1.5em; font-size: 0.95em; }
+/*
+ * A table is the most reliable source of horizontal overflow: `width: 100%`
+ * is a floor, not a ceiling, and one long cell widens the table past the
+ * viewport. `display: block` makes the table itself a scroll container, so it
+ * shrinks to the viewport and scrolls internally instead of pushing the page
+ * wide. Done here rather than with a wrapper element because the markdown
+ * sanitizer emits the <table> and we do not control the markup around it.
+ */
+.prose-ar table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin-bottom: 1.5em;
+  font-size: 0.95em;
+  -webkit-overflow-scrolling: touch;
+}
 .prose-ar th, .prose-ar td { border: 1px solid var(--ink-line); padding: 0.5rem 0.75rem; text-align: start; }
+
+/*
+ * Long URLs, slugs and identifiers are unbreakable tokens. Without
+ * `overflow-wrap` they push the line past the viewport — the article pages
+ * quote source URLs verbatim, so this fires on most of them.
+ */
+.prose-ar p,
+.prose-ar li,
+.prose-ar td,
+.prose-ar blockquote {
+  overflow-wrap: break-word;
+}
+/* In prose a URL should break rather than push the layout. */
+.prose-ar a[href^="http"] {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .prose-ar th { background: var(--ink-raise); font-weight: 600; }
 .prose-ar hr { border: 0; border-top: 1px solid var(--ink-line); margin: 2.5em 0; }
