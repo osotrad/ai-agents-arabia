@@ -35,7 +35,7 @@ jobs:
           BASE: ${{ inputs.base }}
           WIDTH: ${{ inputs.width }}
         run: |
-          set -uo pipefail
+          set -euo pipefail
           cat > probe.mjs <<'JS'
           import puppeteer from "puppeteer-core";
           import { execSync } from "node:child_process";
@@ -111,6 +111,11 @@ jobs:
           console.log(`\n  pages overflowing at ${width}px: ${bad}/${paths.length}`);
           exit 0;
           JS
-          npm i --silent --no-save puppeteer-core >/dev/null 2>&1
+          # Show the reason instead of swallowing it: a silent install failure
+          # surfaced only as "Process completed with exit code 1".
+          npm i --no-save puppeteer-core
+          CHROME=$(ls -d /opt/hostedtoolcache/chrome/*/chrome-linux64/chrome 2>/dev/null | tail -1)
+          if [ -z "$CHROME" ]; then echo "::error::chrome binary not found"; exit 1; fi
+          echo "chrome: $CHROME"
           node probe.mjs
           exit 0
