@@ -94,5 +94,8 @@ jobs:
           [ -n "$URL" ] || { echo "no deploy URL found"; exit 1; }
           sleep 5
           curl -sf "$URL" | grep -q 'dir="rtl"'
-          curl -sf "$URL/llms.txt" | grep -q 'ai-agents-arabia'
+          # The H1 is the site's Arabic name now, not the old English slug —
+          # the spec allows exactly one H1 and the policy is linked, not
+          # inlined, so it is no longer the second one.
+          curl -sf "$URL/llms.txt" | grep -q '^# وكلاء'
 
