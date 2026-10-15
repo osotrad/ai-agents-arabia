@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           cat > probe.mjs <<'JS'
-          const { default: puppeteer } = await import("/tmp/probe/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js");
+          import puppeteer from "puppeteer-core";
           import { execSync } from "node:child_process";
 
           const width = Number(process.env.WIDTH || 390);
@@ -120,5 +120,8 @@ jobs:
           CHROME=$(ls -d /opt/hostedtoolcache/chrome/*/chrome-linux64/chrome 2>/dev/null | tail -1)
           if [ -z "$CHROME" ]; then echo "::error::chrome binary not found"; exit 1; fi
           echo "chrome: $CHROME"
-          NODE_PATH=/tmp/probe/node_modules node probe.mjs
+          # Run from inside the scratch dir so Node resolves puppeteer-core by
+          # its own package name rather than a hand-written internal path.
+          mv probe.mjs /tmp/probe/probe.mjs
+          cd /tmp/probe && node probe.mjs
           exit 0
