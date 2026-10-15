@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           cat > probe.mjs <<'JS'
-          import puppeteer from "puppeteer-core";
+          const { default: puppeteer } = await import("/tmp/probe/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js");
           import { execSync } from "node:child_process";
 
           const width = Number(process.env.WIDTH || 390);
@@ -111,11 +111,14 @@ jobs:
           console.log(`\n  pages overflowing at ${width}px: ${bad}/${paths.length}`);
           exit 0;
           JS
-          # Show the reason instead of swallowing it: a silent install failure
-          # surfaced only as "Process completed with exit code 1".
-          npm i --no-save puppeteer-core
+          # Install into a scratch directory, never the project. Installing in
+          # place makes npm re-resolve the whole tree and fails on a pre-existing
+          # peer conflict between next@16.3.6 and @opennextjs/cloudflare, which
+          # has nothing to do with this probe.
+          mkdir -p /tmp/probe
+          npm i --prefix /tmp/probe --silent puppeteer-core
           CHROME=$(ls -d /opt/hostedtoolcache/chrome/*/chrome-linux64/chrome 2>/dev/null | tail -1)
           if [ -z "$CHROME" ]; then echo "::error::chrome binary not found"; exit 1; fi
           echo "chrome: $CHROME"
-          node probe.mjs
+          NODE_PATH=/tmp/probe/node_modules node probe.mjs
           exit 0
