@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { canonicalUrl } from "@/lib/env";
+import { SERIES } from "@/lib/series";
 import { db, articles, glossaryTerms } from "@/db";
 import { desc, eq } from "drizzle-orm";
 
@@ -18,12 +19,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/about`, changeFrequency: "monthly", priority: 0.4 },
     { url: `${base}/sources`, changeFrequency: "weekly", priority: 0.5 },
     { url: `${base}/contact`, changeFrequency: "monthly", priority: 0.4 },
-    // Series hubs. /topics is the index and lists every series with articles;
-    // the per-series routes are kept in sync with the registry in
-    // app/topics/[topic]/page.tsx.
+    // Series hubs, generated from the registry so the sitemap can never
+    // advertise a series that no longer exists.
     { url: `${base}/topics`, changeFrequency: "weekly", priority: 0.9 },
-    { url: `${base}/topics/langchain`, changeFrequency: "weekly", priority: 0.9 },
-    { url: `${base}/topics/n8n`, changeFrequency: "weekly", priority: 0.9 },
+    ...SERIES.map((s) => ({
+      url: `${base}/topics/${s.slug}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.9,
+    })),
   ];
 
   try {

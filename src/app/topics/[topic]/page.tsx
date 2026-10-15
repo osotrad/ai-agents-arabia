@@ -2,6 +2,7 @@ import { db, articles } from "@/db";
 import { and, asc, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   ArticleCard,
   Container,
@@ -9,37 +10,13 @@ import {
   PageHeader,
   type ArticleSummary,
 } from "@/components/ui";
+import { SERIES, isSeries, seriesFor } from "@/lib/series";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
 
-/**
- * Editorial series. Content lives in `articles.topic`; the hub is pure
- * presentation over a query, so adding a series never needs a route change.
- */
-const TOPICS: Record<
-  string,
-  { eyebrow: string; title: string; lede: string }
-> = {
-  langchain: {
-    eyebrow: "سلسلة",
-    title: "لانغ تشين ولانغ غراف",
-    lede: "ثمانية مقالات تأخذك من السؤال الأول — ما هو الوكيل؟ — إلى وكيل حقيقي تحفظ حالته، وتطلب موافقة بشرية قبل أي إجراء حسّاس. كل مقال يبني على سابقه، وكل مقال يخبرك بماذا ستبني بعده.",
-  },
-  "open-weight-models": {
-    eyebrow: "سلسلة",
-    title: "النماذج مفتوحة الأوزان",
-    lede: "إصدارات النماذج مفتوحة الأوزان: الأرقام التي تعلنها، وما يُتاح فعلياً من معاملات وتنزيل.",
-  },
-  n8n: {
-    eyebrow: "سلسلة",
-    title: "n8n — أتمتة سير العمل",
-    lede: "تسعة مقالات تأخذك من السؤال الأول — ما هو n8n ولماذا يختلف عن كتابة الكود؟ — إلى أتمتة تعمل في الإنتاج: تتعامل مع البيانات، وتعيد المحاولة عند الفشل، وتحفظ أسرارها بشكل صحيح. المقالات الأولى لا تفترض أي خبرة برمجية، ثم تتعمّق حتى تصل إلى التعبيرات والنشر على خادم خاص.",
-  },
-};
-
 export function generateStaticParams() {
-  return Object.keys(TOPICS).map((topic) => ({ topic }));
+  return SERIES.map((s) => ({ topic: s.slug }));
 }
 
 export async function generateMetadata({
@@ -48,9 +25,9 @@ export async function generateMetadata({
   params: Promise<{ topic: string }>;
 }): Promise<Metadata> {
   const { topic } = await params;
-  const t = TOPICS[topic];
-  if (!t) return { title: "سلسلة غير موجودة" };
-  return { title: t.title, description: t.lede };
+  const s = seriesFor(topic);
+  if (!s) return { title: "سلسلة غير موجودة" };
+  return { title: s.title, description: s.lede };
 }
 
 export default async function TopicPage({
@@ -59,14 +36,28 @@ export default async function TopicPage({
   params: Promise<{ topic: string }>;
 }) {
   const { topic } = await params;
-  // Do NOT 404 on an unregistered topic: `articles.topic` is the source of
-  // truth, and a series can hold articles before anyone has written a lede
-  // for it. A dead link costs more than an untitled page.
-  const t = TOPICS[topic] ?? {
-    eyebrow: "سلسلة",
-    title: topic,
-    lede: "",
-  };
+
+  /*
+   * An unregistered slug is a label an agent put on one article, not a series.
+   * Rendering a hub for it produced the empty shells this page used to show:
+   * a header with no title and a list of one.
+   *
+   * Redirect rather than 404. When exactly one article carries the label, that
+   * article is what the visitor meant, so send them there. A bare 404 would be
+   * a dead end, and these URLs can already be indexed.
+   */
+  if (!isSeries(topic)) {
+    const labelled = await db
+      .select({ slug: articles.slug })
+      .from(articles)
+      .where(and(eq(articles.topic, topic), eq(articles.status, "published")))
+      .limit(2);
+    redirect(
+      labelled.length === 1 ? `/news/${labelled[0].slug}` : "/news",
+    );
+  }
+
+  const t = seriesFor(topic)!;
 
   let list: ArticleSummary[] = [];
   try {
@@ -97,7 +88,7 @@ export default async function TopicPage({
 
   return (
     <main>
-      <PageHeader eyebrow={t.eyebrow} title={t.title} lede={t.lede}>
+      <PageHeader eyebrow="سلسلة" title={t.title} lede={t.lede}>
         <p className="mt-4 text-paper-dim text-sm font-mono" dir="ltr">
           {list.length} article{list.length === 1 ? "" : "s"} in this series
         </p>
