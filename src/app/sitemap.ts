@@ -4,7 +4,16 @@ import { SERIES } from "@/lib/series";
 import { db, articles, glossaryTerms } from "@/db";
 import { desc, eq } from "drizzle-orm";
 
-/** Used only when SITE_URL is absent (e.g. a build-time crawl). */
+/**
+ * Articles are published at runtime (Content API / MCP) with no redeploy.
+ * Without this flag Next.js prerenders the sitemap once at build time and
+ * serves that snapshot until the next deploy: the live file listed 34
+ * articles (newest lastmod 2026-10-15) while the site had 59 published.
+ * Same pattern as src/app/feed.xml/route.ts.
+ */
+export const dynamic = "force-dynamic";
+
+/** Used only when SITE_URL is absent. */
 const FALLBACK_SITE_URL = "https://ai-agents-arabia.osotrad101.workers.dev";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -13,7 +22,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const statics: MetadataRoute.Sitemap = [
     { url: base, changeFrequency: "hourly", priority: 1 },
     { url: `${base}/news`, changeFrequency: "hourly", priority: 0.9 },
-    { url: `${base}/glossary`, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/standards`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/corrections`, changeFrequency: "weekly", priority: 0.4 },
     { url: `${base}/about`, changeFrequency: "monthly", priority: 0.4 },
@@ -31,7 +39,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const arts = await db
-      .select({ slug: articles.slug, publishedAt: articles.publishedAt })
+      .select({
+        slug: articles.slug,
+        publishedAt: articles.publishedAt,
+        updatedAt: articles.updatedAt,
+      })
       .from(articles)
       .where(eq(articles.status, "published"))
       .orderBy(desc(articles.publishedAt))
@@ -45,9 +57,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     return [
       ...statics,
+      // An empty glossary is a thin page: advertise it only once it has terms.
+      ...(terms.length > 0
+        ? [
+            {
+              url: `${base}/glossary`,
+              changeFrequency: "daily" as const,
+              priority: 0.8,
+            },
+          ]
+        : []),
       ...arts.map((a) => ({
         url: `${base}/news/${a.slug}`,
-        lastModified: a.publishedAt ?? undefined,
+        // Real modification time, so edited articles (version 2+) are recrawled.
+        lastModified: a.updatedAt ?? a.publishedAt ?? undefined,
         changeFrequency: "daily" as const,
         priority: 0.7,
       })),
@@ -58,7 +81,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       })),
     ];
   } catch {
-    // DB unavailable at build time — serve static routes only
+    // DB unavailable — serve static routes only
     return statics;
   }
 }
