@@ -41,6 +41,13 @@ export const metadata: Metadata = {
   },
   twitter: { card: "summary_large_image" },
   alternates: {
+    // Default self-referencing canonical for every page that does not set its
+    // own (home, /news, /glossary, /topics, /about, ...). "./" resolves against
+    // metadataBase + the current pathname and drops the query string, so
+    // tracking params (?utm_*, ?fbclid) and the www host all consolidate onto
+    // https://wokala.vip/<path>. Pages that define `alternates` themselves
+    // (articles, glossary terms) override this.
+    canonical: "./",
     types: {
       "application/rss+xml": [{ url: "/feed.xml", title: "وكلاء" }],
     },
