@@ -14,13 +14,41 @@ import { ARTICLE_TYPES, TYPE_LABELS_PLURAL } from "@/lib/format";
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
 
-export const metadata: Metadata = {
-  title: "الأخبار",
-  description:
-    "كل ما نُشر عن وكلاء الذكاء الاصطناعي، مرتبًا زمنيًا، مع رابط كل مصدر.",
-};
-
 type SP = { type?: string };
+
+/**
+ * /news is the canonical listing. Every `?type=` variant is a filtered subset of
+ * the same list: thin, near-duplicate, and already reachable from /news, so it
+ * is kept out of the index with `noindex, follow` (links still pass signals).
+ *
+ * The filtered view deliberately sets NO canonical: noindex + a canonical that
+ * points at a different URL is a mixed signal. `alternates` is replaced, not
+ * merged, so the RSS link from the root layout is repeated here.
+ *
+ * This page stays crawlable (not in robots.txt) so the noindex is actually seen.
+ */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<SP>;
+}): Promise<Metadata> {
+  const { type } = await searchParams;
+  const base: Metadata = {
+    title: "الأخبار",
+    description:
+      "كل ما نُشر عن وكلاء الذكاء الاصطناعي، مرتبًا زمنيًا، مع رابط كل مصدر.",
+  };
+  if (!type) return base; // inherits the layout's self-referencing canonical → /news
+  return {
+    ...base,
+    robots: { index: false, follow: true },
+    alternates: {
+      types: {
+        "application/rss+xml": [{ url: "/feed.xml", title: "وكلاء" }],
+      },
+    },
+  };
+}
 
 export default async function NewsPage({
   searchParams,
