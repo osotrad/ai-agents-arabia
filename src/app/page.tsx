@@ -11,6 +11,7 @@ import {
   type ArticleSummary,
 } from "@/components/ui";
 import { isoDate, timeAgo, typeLabel } from "@/lib/format";
+import { SERIES } from "@/lib/series";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300; // ISR: revalidate every 5 min
@@ -245,6 +246,46 @@ export default async function Home() {
                   </li>
                 ))}
               </ul>
+            </div>
+          </Container>
+        </section>
+      )}
+
+      {/* ── Series (curated reading paths) ───────────────────────────────
+          Static links from the home page to every hub in the series registry.
+          Search Console reported /topics/* as "Discovered – currently not
+          indexed"; a prominent link from the most-crawled page is the
+          strongest internal signal available. Driven by SERIES so it can never
+          advertise a series that no longer exists. */}
+      {SERIES.length > 0 && (
+        <section className="border-t border-ink-line py-16">
+          <Container>
+            <SectionHeading
+              title="سلاسل تعليمية"
+              href="/topics"
+              linkLabel="كل السلاسل"
+            />
+            <div className="grid gap-5 sm:grid-cols-2">
+              {SERIES.map((s) => (
+                <Link
+                  key={s.slug}
+                  href={`/topics/${s.slug}`}
+                  className="group border border-ink-line bg-ink-raise/40 p-6 hover:border-signal/50 transition-colors"
+                >
+                  <p className="font-mono text-[11px] text-signal" dir="ltr">
+                    {"// series"}
+                  </p>
+                  <h3 className="mt-3 font-display text-lg font-bold group-hover:text-signal transition-colors">
+                    {s.title}
+                  </h3>
+                  <p className="mt-2 text-sm text-paper-dim leading-relaxed line-clamp-3">
+                    {s.lede}
+                  </p>
+                  <span className="mt-4 inline-block font-mono text-xs text-paper-dim group-hover:text-signal transition-colors">
+                    ابدأ السلسلة ←
+                  </span>
+                </Link>
+              ))}
             </div>
           </Container>
         </section>
