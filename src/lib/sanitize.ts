@@ -31,6 +31,21 @@ const ALLOWED_TAGS = [
   "td",
 ];
 
+const SITE_ORIGIN = "https://wokala.vip";
+
+/**
+ * True for links that stay on this site: root-relative paths ("/news/x",
+ * "/contact?from=x") and absolute URLs on our own origin. Protocol-relative
+ * ("//evil.com") and backslash tricks ("/\evil.com") are NOT internal.
+ */
+function isInternalHref(href: string | undefined): boolean {
+  if (!href) return false;
+  if (href.startsWith("/")) {
+    return !href.startsWith("//") && !href.startsWith("/\\");
+  }
+  return href === SITE_ORIGIN || href.startsWith(`${SITE_ORIGIN}/`);
+}
+
 /** Sanitize an HTML string produced from markdown. */
 export function sanitizeArticleHtml(html: string): string {
   return sanitizeHtml(html, {
@@ -40,12 +55,27 @@ export function sanitizeArticleHtml(html: string): string {
       code: ["class"],
     },
     allowedSchemes: ["http", "https", "mailto"],
-    // Force safe link behaviour on every anchor.
     transformTags: {
-      a: sanitizeHtml.simpleTransform("a", {
-        rel: "noopener noreferrer nofollow",
-        target: "_blank",
-      }),
+      a: (tagName, attribs) => {
+        // Internal links: plain followed links in the same tab, so they pass
+        // link equity and keep readers on the site. Any rel/target an author
+        // supplied is dropped.
+        if (isInternalHref(attribs.href)) {
+          const internal = { ...attribs };
+          delete internal.rel;
+          delete internal.target;
+          return { tagName, attribs: internal };
+        }
+        // Every other link: force safe external behaviour.
+        return {
+          tagName,
+          attribs: {
+            ...attribs,
+            rel: "noopener noreferrer nofollow",
+            target: "_blank",
+          },
+        };
+      },
     },
     disallowedTagsMode: "discard",
   });
