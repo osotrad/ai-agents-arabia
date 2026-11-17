@@ -89,6 +89,18 @@ export const articles = pgTable(
     /** Arabic alt text. Required in practice: the site is RTL prose. */
     imageAlt: text("image_alt"),
     /**
+     * SEO fields written by the publishing pipeline straight into the table.
+     * They are SERP-sized variants of `titleAr` / `excerptAr`. All nullable:
+     * the article page falls back to the on-page title and excerpt when a
+     * value is missing (articles created through the Content API never set
+     * them).
+     */
+    metaTitle: text("meta_title"),
+    metaDescription: text("meta_description"),
+    ogTitle: text("og_title"),
+    ogDescription: text("og_description"),
+    seoKeywords: text("seo_keywords").array(),
+    /**
      * Optional editorial series slug (e.g. "langchain"). Powers the
      * /topics/[topic] hub pages, which list their members in reading order
      * via `topicOrder`. Null means the article belongs to no series.
