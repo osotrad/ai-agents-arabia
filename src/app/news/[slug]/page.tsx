@@ -17,6 +17,7 @@ import {
   timeAgo,
   typeLabel,
 } from "@/lib/format";
+import { canonicalUrl, siteName } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -114,13 +115,26 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const a = await getArticle(slug);
   if (!a) return {};
+
+  // The publishing pipeline writes SERP-sized SEO fields next to the on-page
+  // title and excerpt. Prefer them when present; fall back to the on-page copy
+  // for articles that never had them (e.g. created through the Content API).
+  const metaTitle = a.metaTitle?.trim() || null;
+  const description =
+    a.metaDescription?.trim() || a.excerptAr?.trim() || undefined;
+  const ogTitle = a.ogTitle?.trim() || metaTitle || a.titleAr;
+  const ogDescription = a.ogDescription?.trim() || description;
+
   return {
-    title: a.titleAr,
-    description: a.excerptAr ?? undefined,
+    // `absolute` skips the "%s — وكلاء" template from the root layout: meta
+    // titles are already sized for the results page, and the suffix would push
+    // them past the ~60 characters that get displayed.
+    title: metaTitle ? { absolute: metaTitle } : a.titleAr,
+    description,
     alternates: { canonical: `/news/${a.slug}` },
     openGraph: {
-      title: a.titleAr,
-      description: a.excerptAr ?? undefined,
+      title: ogTitle,
+      description: ogDescription,
       locale: "ar_AR",
       type: "article",
       publishedTime: a.publishedAt?.toISOString(),
@@ -147,6 +161,9 @@ export default async function ArticlePage({ params }: Params) {
 
   // One domain row can back several claims; show each source once.
   const domains = [...new Set(srcs.map((s) => s.domain))];
+
+  const origin = canonicalUrl().replace(/\/+$/, "");
+  const articleUrl = `${origin}/news/${a.slug}`;
 
   return (
     <main>
@@ -327,11 +344,23 @@ export default async function ArticlePage({ params }: Params) {
             "@context": "https://schema.org",
             "@type": "NewsArticle",
             headline: a.titleAr,
-            description: a.excerptAr ?? undefined,
+            description:
+              a.metaDescription?.trim() || a.excerptAr || undefined,
+            url: articleUrl,
+            mainEntityOfPage: { "@type": "WebPage", "@id": articleUrl },
             datePublished: a.publishedAt?.toISOString(),
             dateModified: a.updatedAt?.toISOString(),
             inLanguage: "ar",
-            author: { "@type": "Organization", name: "وكلاء" },
+            image: a.imageUrl ? [a.imageUrl] : undefined,
+            keywords: a.seoKeywords?.length
+              ? a.seoKeywords.join(", ")
+              : undefined,
+            author: { "@type": "Organization", name: siteName() },
+            publisher: {
+              "@type": "Organization",
+              name: siteName(),
+              url: origin,
+            },
             citation: [...new Set(srcs.map((s) => s.url))],
           }),
         }}
