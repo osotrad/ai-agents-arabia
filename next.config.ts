@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      // The AI guide is a glossary entry now, not a news item.
+      {
+        source: "/news/artificial-intelligence",
+        destination: "/glossary/artificial-intelligence",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
