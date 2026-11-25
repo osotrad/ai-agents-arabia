@@ -1,5 +1,5 @@
 import { db, articles } from "@/db";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
@@ -76,7 +76,11 @@ export default async function NewsPage({
       .where(
         active
           ? sql`status = 'published' AND type = ${active}::article_type`
-          : eq(articles.status, "published" as never),
+          : // Glossary-type guides live under /glossary, not in the news feed.
+            and(
+              eq(articles.status, "published" as never),
+              ne(articles.type, "glossary" as never),
+            ),
       )
       .orderBy(desc(articles.publishedAt))
       .limit(60)) as ArticleSummary[];
@@ -89,7 +93,7 @@ export default async function NewsPage({
       <PageHeader
         eyebrow="news"
         title="الأخبار"
-        lede="كل مادة منشورة عن وكلاء الذكاء الاصطناعي، الأحدث أولًا. كل خبر مبنيّ على مصدرَين مستقلَّين على الأقل، ومصادره مذكورة داخل المقال."
+        lede="كل مادة منشورة عن وكلاء الذكاء الاصطناعي، الأحدث أولًا. كل خبر مبنيّ على مصدرَين مستقلَّين على الأقل، ومصادره مذكورة داخل المقال."
       />
 
       {/* Type filter — plain links, so it works without JavaScript. */}

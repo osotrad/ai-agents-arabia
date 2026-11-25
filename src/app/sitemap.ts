@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { canonicalUrl } from "@/lib/env";
 import { SERIES } from "@/lib/series";
 import { db, articles, glossaryTerms } from "@/db";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 
 /**
  * Articles are published at runtime (Content API / MCP) with no redeploy.
@@ -38,6 +38,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   try {
+    // Glossary-type articles live under /glossary/{slug}; /news/{slug} only
+    // redirects there, so it must not be advertised.
     const arts = await db
       .select({
         slug: articles.slug,
@@ -45,9 +47,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         updatedAt: articles.updatedAt,
       })
       .from(articles)
-      .where(eq(articles.status, "published"))
+      .where(
+        and(
+          eq(articles.status, "published"),
+          ne(articles.type, "glossary"),
+        ),
+      )
       .orderBy(desc(articles.publishedAt))
       .limit(1000);
+
+    const guides = await db
+      .select({ slug: articles.slug, updatedAt: articles.updatedAt })
+      .from(articles)
+      .where(
+        and(
+          eq(articles.status, "published"),
+          eq(articles.type, "glossary"),
+        ),
+      )
+      .limit(1000);
+    const guideModified = new Map(guides.map((g) => [g.slug, g.updatedAt]));
 
     const terms = await db
       .select({ slug: glossaryTerms.slug })
@@ -76,8 +95,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       })),
       ...terms.map((t) => ({
         url: `${base}/glossary/${t.slug}`,
+        lastModified: guideModified.get(t.slug) ?? undefined,
         changeFrequency: "monthly" as const,
-        priority: 0.6,
+        // Full guides outrank one-paragraph definitions.
+        priority: guideModified.has(t.slug) ? 0.8 : 0.6,
       })),
     ];
   } catch {
